@@ -2,30 +2,53 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Mini App Test</title>
+  <title>Telegram Mini App</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     body {
       background: #0f172a;
       color: white;
       font-family: Arial;
-      padding: 40px;
-      text-align: center;
+      padding: 30px;
     }
-    .box {
+    .card {
       background: #1e293b;
-      padding: 20px;
+      padding: 16px;
       border-radius: 12px;
       margin-top: 20px;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background: #22c55e;
+      color: black;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
 
-<h1>🚀 GitHub Pages работает</h1>
+<h2>🚀 Telegram Mini App</h2>
 
-<div class="box">
-  Если ты видишь этот экран — значит всё получилось.
-</div>
+<div class="card" id="info">Загрузка...</div>
+
+<button onclick="Telegram.WebApp.close()">Закрыть</button>
+
+<script>
+  const tg = window.Telegram.WebApp;
+  tg.ready();
+
+  const user = tg.initDataUnsafe.user;
+
+  document.getElementById("info").innerHTML = `
+    <b>Имя:</b> ${user.first_name}<br>
+    <b>ID:</b> ${user.id}
+  `;
+</script>
 
 </body>
 </html>
