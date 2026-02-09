@@ -1,53 +1,64 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Telegram Mini App</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    body {
-      background: #0f172a;
-      color: white;
-      font-family: Arial;
-      padding: 30px;
-    }
-    .card {
-      background: #1e293b;
-      padding: 16px;
-      border-radius: 12px;
-      margin-top: 20px;
-    }
-    button {
-      margin-top: 20px;
-      width: 100%;
-      padding: 14px;
-      font-size: 16px;
-      border: none;
-      border-radius: 10px;
-      background: #22c55e;
-      color: black;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>AI Video Store</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+body {
+  background:#0f172a;
+  color:#fff;
+  font-family:Arial;
+  padding:20px;
+}
+.card {
+  background:#1e293b;
+  padding:16px;
+  border-radius:12px;
+  margin-bottom:16px;
+}
+.price {
+  font-size:18px;
+  color:#22c55e;
+  margin-top:8px;
+}
+button {
+  margin-top:12px;
+  width:100%;
+  padding:12px;
+  border:none;
+  border-radius:10px;
+  font-size:16px;
+  background:#3b82f6;
+  color:white;
+}
+</style>
 </head>
 <body>
 
-<h2>🚀 Telegram Mini App</h2>
+<h2>🎬 AI Видео</h2>
 
-<div class="card" id="info">Загрузка...</div>
+<div class="card">
+  <b>Realistic Video</b><br>
+  15 секунд · Реализм<br>
+  <div class="price">$25</div>
+  <button onclick="selectProduct('Realistic Video')">Выбрать</button>
+</div>
 
-<button onclick="Telegram.WebApp.close()">Закрыть</button>
+<div class="card">
+  <b>Pro Cinematic</b><br>
+  30 секунд · Кино<br>
+  <div class="price">$50</div>
+  <button onclick="selectProduct('Pro Cinematic')">Выбрать</button>
+</div>
 
 <script>
-  const tg = window.Telegram.WebApp;
-  tg.ready();
+const tg = window.Telegram.WebApp;
+tg.ready();
 
-  const user = tg.initDataUnsafe.user;
-
-  document.getElementById("info").innerHTML = `
-    <b>Имя:</b> ${user.first_name}<br>
-    <b>ID:</b> ${user.id}
-  `;
+function selectProduct(name) {
+  tg.showAlert("Вы выбрали: " + name);
+}
 </script>
 
 </body>
