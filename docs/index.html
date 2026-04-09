@@ -2,72 +2,270 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Mini App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Avalava-style Mini App</title>
   <link rel="stylesheet" href="./style.css" />
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
-  <div class="app">
-    <header class="hero">
-      <div class="badge">Telegram Mini App</div>
-      <h1>AI Tools</h1>
-      <p>Простая база под image, video и enhance.</p>
-    </header>
-
-    <section class="cards">
-      <button class="card" onclick="showScreen('image')">
-        <h2>Generate Image</h2>
-        <p>Prompt + Nano Banana 2 / Pro</p>
-      </button>
-
-      <button class="card" onclick="showScreen('video')">
-        <h2>Animate Photo</h2>
-        <p>Prompt + reference photo</p>
-      </button>
-
-      <button class="card" onclick="showScreen('enhance')">
-        <h2>Enhance Quality</h2>
-        <p>Upload image + progress %</p>
-      </button>
-    </section>
-
-    <section id="image" class="screen hidden">
-      <h3>Generate Image</h3>
-      <textarea id="imagePrompt" placeholder="Напиши prompt для изображения..."></textarea>
-      <select id="imageModel">
-        <option>Nano Banana 2</option>
-        <option>Nano Banana Pro</option>
-      </select>
-      <button class="main-btn" onclick="generateImage()">Generate</button>
-      <div id="imageResult" class="result-box">Результат будет здесь</div>
-    </section>
-
-    <section id="video" class="screen hidden">
-      <h3>Animate Photo</h3>
-      <textarea id="videoPrompt" placeholder="Напиши prompt для анимации..."></textarea>
-      <input id="videoFile" type="file" accept="image/*" />
-      <button class="main-btn" onclick="animatePhoto()">Animate</button>
-      <div id="videoResult" class="result-box">Результат будет здесь</div>
-    </section>
-
-    <section id="enhance" class="screen hidden">
-      <h3>Enhance Quality</h3>
-      <input id="enhanceFile" type="file" accept="image/*" />
-      <button class="main-btn" onclick="startEnhance()">Enhance</button>
-
-      <div class="progress-wrap">
-        <div class="progress-bar">
-          <div id="progressFill" class="progress-fill"></div>
-        </div>
-        <div class="progress-row">
-          <span id="progressPercent">0%</span>
-          <span id="progressStatus">Ожидание</span>
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="left-cluster">
+        <button class="icon-btn mobile-only" id="backBtn">←</button>
+        <div class="brand">
+          <div class="brand-mark">av</div>
+          <div class="brand-text">avalava</div>
         </div>
       </div>
-    </section>
+      <nav class="main-nav desktop-nav">
+        <button data-screen="home" class="nav-link active">Главная</button>
+        <button data-screen="ideas" class="nav-link">Идеи</button>
+        <button data-screen="image" class="nav-link">Картинка</button>
+        <button data-screen="video" class="nav-link">Видео</button>
+        <button data-screen="audio" class="nav-link">Аудио</button>
+      </nav>
+      <div class="right-cluster">
+        <button class="buy-pill" id="openPricing">КУПИТЬ <span class="divider"></span> <span id="creditAmount">0</span> 🪙</button>
+        <button class="avatar-btn" id="openProfile">K</button>
+        <button class="icon-btn" id="menuDots">⋮</button>
+        <button class="icon-btn" id="closeApp">✕</button>
+      </div>
+    </header>
+
+    <main class="screens">
+      <section id="screen-home" class="screen active">
+        <div class="promo-row">
+          <article class="promo-card gold">
+            <div>
+              <h3>Актуальные новости, шаблоны, обновления нейросетей</h3>
+              <button class="soft-btn">Подписаться →</button>
+            </div>
+          </article>
+          <article class="promo-card crowd">
+            <div>
+              <h3>Вступай в сообщество!</h3>
+              <button class="soft-btn">Вступить →</button>
+            </div>
+          </article>
+          <article class="promo-card blue">
+            <div>
+              <h3>Avalava теперь в VK</h3>
+              <button class="soft-btn">Привязать VK →</button>
+            </div>
+          </article>
+          <article class="promo-card violet">
+            <div>
+              <h3>Avalava теперь в макс</h3>
+              <button class="soft-btn">Перейти →</button>
+            </div>
+          </article>
+          <article class="promo-card panda">
+            <div>
+              <h3>Танцы-Танцы и еще раз Танцы!</h3>
+              <button class="soft-btn">Выбрать тренд →</button>
+            </div>
+          </article>
+        </div>
+
+        <div class="section-head">
+          <h2>Создать</h2>
+        </div>
+        <div class="tool-icons-row">
+          <button class="tool-icon" data-screen="image"><span>🖼️</span><small>Картинка</small></button>
+          <button class="tool-icon" data-screen="video"><span>🎥</span><small>Видео</small></button>
+          <button class="tool-icon" data-screen="image"><span>🍌</span><small>NanoBanana Pro</small></button>
+          <button class="tool-icon" data-screen="video"><span>🌀</span><small>Kling 2.6 Motion</small></button>
+          <button class="tool-icon" data-screen="audio"><span>🎵</span><small>Аудио</small></button>
+          <button class="tool-icon" data-screen="video"><span>✨</span><small>Оживить фото</small></button>
+          <button class="tool-icon" data-screen="video"><span>V3</span><small>Veo 3.1</small></button>
+          <button class="tool-icon" data-screen="tools"><span>🛠️</span><small>Инструменты</small></button>
+        </div>
+
+        <div class="section-head trends-head">
+          <h2>✨ Тренды</h2>
+          <p>Создавайте потрясающие фото и видео с помощью нейросетей</p>
+        </div>
+
+        <div class="masonry-grid">
+          <article class="trend-card tall red">
+            <span class="tag">Популярное</span>
+            <div class="trend-title">ТРЕНД В ФОТОБУДКЕ</div>
+          </article>
+          <article class="trend-card tall easter">
+            <span class="tag">Популярное</span>
+            <div class="trend-title">ПАСХАЛЬНАЯ ОТКРЫТКА</div>
+          </article>
+          <article class="trend-card medium pixar">
+            <div class="trend-title">ПОРТРЕТ В СТИЛЕ ПИКСАР</div>
+          </article>
+          <article class="trend-card tall cat">
+            <span class="tag">Популярное</span>
+            <div class="trend-title">Я ХОЧУ СКАЗАТЬ (12 СЕК)</div>
+          </article>
+          <article class="trend-card medium bw">
+            <span class="tag">Популярное</span>
+            <div class="trend-title">ТРЕНДОВЫЙ КОЛЛАЖ</div>
+          </article>
+          <article class="trend-card medium woman"></article>
+          <article class="trend-card medium cat2"></article>
+          <article class="trend-card medium woman2"></article>
+          <article class="trend-card medium citybw">
+            <div class="trend-title">ОЖИВИТЬ ФОТО</div>
+          </article>
+        </div>
+      </section>
+
+      <section id="screen-image" class="screen form-screen">
+        <div class="crumb">🖼️ Картинка</div>
+        <label class="field-label">Модель</label>
+        <button class="select-row" id="imageModelSelect"><span id="imageModelValue">🔥 NanoBanana PRO</span><span>›</span></button>
+
+        <label class="field-label">Изображения</label>
+        <label class="upload-tile">
+          <input type="file" id="imageUpload" accept="image/*" />
+          <div class="upload-inner">🖼️<br><small>Загрузите одно или несколько изображений для редактирования.</small></div>
+        </label>
+
+        <label class="field-label">Запрос <span class="star">*</span></label>
+        <textarea class="big-textarea" id="imagePrompt" placeholder="Опишите, что должно быть на изображении."></textarea>
+
+        <label class="field-label">Соотношение сторон</label>
+        <button class="select-row" id="ratioSelect"><span id="ratioValue">Автоматически</span><span>›</span></button>
+      </section>
+
+      <section id="screen-video" class="screen form-screen">
+        <div class="crumb">🎞️ Видео</div>
+        <label class="field-label">Модель</label>
+        <button class="select-row" id="videoModelSelect"><span id="videoModelValue">Kling 2.5 Turbo</span><span>›</span></button>
+
+        <div id="videoStandardFields">
+          <label class="field-label">Изображения</label>
+          <label class="upload-tile horizontal">
+            <input type="file" id="videoUpload" accept="image/*" />
+            <div class="upload-inner">🖼️<br><small>С этого кадра начнется видео. Если не указано, видео сгенерируется с нуля.</small></div>
+          </label>
+
+          <label class="field-label">Запрос <span class="star">*</span></label>
+          <textarea class="big-textarea" id="videoPrompt" placeholder="Опишите, что должно происходить в видео."></textarea>
+
+          <label class="field-label">Соотношение сторон</label>
+          <button class="select-row" id="videoRatioSelect"><span id="videoRatioValue">16:9</span><span>›</span></button>
+
+          <label class="field-label">Длительность (сек)</label>
+          <button class="select-row"><span>5</span><span>›</span></button>
+
+          <label class="field-label collapsible">Дополнительные параметры</label>
+          <button class="select-row compact"><span>Развернуть</span><span>⌄</span></button>
+        </div>
+
+        <div id="veoFields" class="hidden">
+          <label class="field-label">Версия модели</label>
+          <button class="select-row"><span>Veo3 — Fast</span><span>›</span></button>
+
+          <label class="field-label">Режим</label>
+          <div class="toggle-row">
+            <button class="toggle-pill active">Генерация</button>
+            <button class="toggle-pill">Вдохновение</button>
+          </div>
+
+          <label class="field-label">Изображения</label>
+          <div class="dual-upload-grid">
+            <label class="upload-tile dual">
+              <input type="file" accept="image/*" />
+              <div class="upload-inner">🖼️<br><small>Начальный кадр</small></div>
+            </label>
+            <label class="upload-tile dual">
+              <input type="file" accept="image/*" />
+              <div class="upload-inner">🖼️<br><small>Конечный кадр</small></div>
+            </label>
+          </div>
+
+          <label class="field-label">Запрос <span class="star">*</span></label>
+          <textarea class="big-textarea" placeholder="Опишите, что должно происходить в видео."></textarea>
+
+          <label class="field-label">Соотношение сторон</label>
+          <button class="select-row" id="veoRatioSelect"><span id="veoRatioValue">16:9</span><span>›</span></button>
+        </div>
+      </section>
+
+      <section id="screen-tools" class="screen">
+        <div class="section-head tools-screen-head">
+          <h2>✨ Инструменты</h2>
+          <p>Полезные эффекты для ваших творческих проектов</p>
+        </div>
+        <div class="tools-showcase">
+          <article class="tool-showcase-card quality"><div>УЛУЧШИТЬ КАЧЕСТВО ФОТО</div></article>
+          <article class="tool-showcase-card replace"><div>ЗАМЕНА ОБЪЕКТА</div></article>
+          <article class="tool-showcase-card remove"><div>УДАЛЕНИЕ ОБЪЕКТА</div></article>
+          <article class="tool-showcase-card add"><div>ДОБАВЛЕНИЕ ОБЪЕКТА</div></article>
+        </div>
+      </section>
+
+      <section id="screen-profile" class="screen">
+        <div class="profile-tabs">
+          <button class="toggle-pill active">Профиль</button>
+          <button class="toggle-pill">Аккаунт</button>
+          <button class="toggle-pill">Партнерство</button>
+        </div>
+        <div class="profile-banner"></div>
+        <div class="profile-meta">
+          <div class="profile-avatar"></div>
+          <div>
+            <h3>KOKOS ADMIN ⚙️</h3>
+            <p>0 Постов</p>
+          </div>
+        </div>
+        <div class="share-row">
+          <button class="share-btn">✈ Поделиться</button>
+          <button class="link-btn">🔗</button>
+        </div>
+        <div class="empty-state">
+          <div class="empty-icon">✦</div>
+          <h3>У вас ещё нет генераций.</h3>
+          <p>Добавляйте свои лучшие работы в профиль, чтобы делиться ими с другими!</p>
+        </div>
+        <div class="publish-wrap"><button class="publish-btn">↪ Опубликовать</button></div>
+      </section>
+    </main>
+
+    <div class="sticky-generate" id="generateBar">
+      <div class="stepper">
+        <button>−</button>
+        <span>1/4</span>
+        <button>+</button>
+      </div>
+      <button class="generate-btn" id="generateAction">✧ Сгенерировать — 20</button>
+    </div>
   </div>
 
+  <div class="modal-backdrop hidden" id="modelModalBackdrop">
+    <div class="modal-card">
+      <div class="modal-head"><h3>Модель</h3><button class="icon-btn close-modal">✕</button></div>
+      <div id="modelList" class="model-list"></div>
+      <button class="show-more-btn">Показать все модели (+8)</button>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="ratioModalBackdrop">
+    <div class="modal-card wide">
+      <div class="ratio-list" id="ratioList"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="pricingModalBackdrop">
+    <div class="modal-card pricing-modal">
+      <div class="modal-head"><h3>Тарифы</h3><button class="icon-btn close-pricing">✕</button></div>
+      <div class="pricing-grid">
+        <article class="price-option"><h4>Тест</h4><div class="rub">99₽</div><div class="credit-chip">🪙 Всего 100 кредитов</div><p>Пробная покупка кредитов для новых пользователей</p><button>Выбрать</button></article>
+        <article class="price-option"><h4>Базовый</h4><div class="rub">499₽ <small>/месяц</small></div><div class="credit-chip">🪙 Всего 525 кредитов</div><p>До 105 фото, до 35 видео генераций</p><button>Выбрать</button></article>
+        <article class="price-option featured"><h4>Про</h4><div class="rub">999₽ <small>/месяц</small></div><div class="credit-chip">🪙 Всего 1150 кредитов</div><p>До 230 фото, до 75 видео генераций</p><button>Выбрать</button></article>
+        <article class="price-option purple"><h4>Максимум</h4><div class="rub">1999₽ <small>/месяц</small></div><div class="credit-chip">🪙 Всего 2400 кредитов</div><p>До 480 фото, до 160 видео генераций</p><button>Выбрать</button></article>
+        <article class="price-option gold"><h4>Креатор</h4><div class="rub">4999₽ <small>/месяц</small></div><div class="credit-chip">🪙 Всего 6500 кредитов</div><p>До 1300 фото, до 430 видео генераций</p><button>Выбрать</button></article>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
