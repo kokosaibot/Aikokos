@@ -1,23 +1,39 @@
-const http = require("http");
+const express = require("express");
+const cors = require("cors");
+const axios = require("axios");
 
-const PORT = Number(process.env.PORT || 3000);
-const HOST = "0.0.0.0";
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const server = http.createServer((req, res) => {
-  if (req.url === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, port: PORT }));
-    return;
+app.use(cors());
+app.use(express.json());
+
+app.get("/health", (req, res) => {
+  res.json({ ok: true });
+});
+
+app.post("/api/generate-image", async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    const response = await axios.post(
+      "https://fal.run/fal-ai/nano-banana",
+      { prompt },
+      {
+        headers: {
+          Authorization: `Key ${process.env.FAL_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    res.json(response.data);
+  } catch (err) {
+    console.error(err.response?.data || err.message);
+    res.status(500).json({ error: "Generation failed" });
   }
-
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("WORKING 🚀");
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
-});
-
-server.on("error", (err) => {
-  console.error("SERVER ERROR:", err);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port", PORT);
 });
