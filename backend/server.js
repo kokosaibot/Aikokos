@@ -1,11 +1,12 @@
 const http = require("http");
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
+const HOST = "0.0.0.0";
 
 const server = http.createServer((req, res) => {
   if (req.url === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true }));
+    res.end(JSON.stringify({ ok: true, port: PORT }));
     return;
   }
 
@@ -13,6 +14,10 @@ const server = http.createServer((req, res) => {
   res.end("WORKING 🚀");
 });
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port", PORT);
+server.listen(PORT, HOST, () => {
+  console.log(`Server running on http://${HOST}:${PORT}`);
+});
+
+server.on("error", (err) => {
+  console.error("SERVER ERROR:", err);
 });
