@@ -3,45 +3,51 @@ const cors = require("cors");
 const axios = require("axios");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 app.use(cors());
-app.use(express.json({ limit: "10mb" }));
+app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Backend работает 🚀");
-});
+// 🧠 временная база (потом заменим на БД)
+let users = {};
 
+// 🟢 получить юзера
+function getUser(userId) {
+  if (!users[userId]) {
+    users[userId] = {
+      credits: 50 // стартовый баланс
+    };
+  }
+  return users[userId];
+}
+
+// ✅ health
 app.get("/health", (req, res) => {
-  res.json({ ok: true, port: PORT });
+  res.json({ ok: true });
 });
 
+// 💰 получить баланс
+app.get("/api/user/:id", (req, res) => {
+  const user = getUser(req.params.id);
+  res.json(user);
+});
+
+// 🖼️ генерация картинки
 app.post("/api/generate-image", async (req, res) => {
   try {
-    const { prompt, model } = req.body;
+    const { prompt, userId } = req.body;
 
-    if (!prompt || !prompt.trim()) {
-      return res.status(400).json({
-        ok: false,
-        error: "Prompt is required"
-      });
+    const user = getUser(userId);
+
+    if (user.credits < 1) {
+      return res.status(400).json({ error: "Нет кредитов" });
     }
 
-    if (!process.env.FAL_KEY) {
-      return res.status(500).json({
-        ok: false,
-        error: "FAL_KEY is missing in Railway Variables"
-      });
-    }
-
-    const imageEndpoint =
-      model === "Nano Banana 2"
-        ? "https://fal.run/fal-ai/nano-banana-2"
-        : "https://fal.run/fal-ai/nano-banana";
+    user.credits -= 1;
 
     const response = await axios.post(
-      imageEndpoint,
-      { prompt: prompt.trim() },
+      "https://fal.run/fal-ai/nano-banana",
+      { prompt },
       {
         headers: {
           Authorization: `Key ${process.env.FAL_KEY}`,
@@ -50,69 +56,54 @@ app.post("/api/generate-image", async (req, res) => {
       }
     );
 
-    return res.json({
+    res.json({
       ok: true,
-      result: response.data
+      image: response.data.images?.[0]?.url,
+      credits: user.credits
     });
+
   } catch (err) {
-    console.error("IMAGE ERROR:", err.response?.data || err.message);
-    return res.status(500).json({
-      ok: false,
-      error: err.response?.data || err.message || "Image generation failed"
-    });
+    console.error(err.message);
+    res.status(500).json({ error: "Ошибка генерации" });
   }
 });
 
+// 🎥 генерация видео
 app.post("/api/generate-video", async (req, res) => {
   try {
-    const { prompt, model, duration, aspect_ratio } = req.body;
+    const { prompt, userId } = req.body;
 
-    if (!prompt || !prompt.trim()) {
-      return res.status(400).json({
-        ok: false,
-        error: "Prompt is required"
-      });
+    const user = getUser(userId);
+
+    if (user.credits < 8) {
+      return res.status(400).json({ error: "Недостаточно кредитов" });
     }
 
-    if (!process.env.FAL_KEY) {
-      return res.status(500).json({
-        ok: false,
-        error: "FAL_KEY is missing in Railway Variables"
-      });
-    }
+    user.credits -= 8;
 
-    let videoEndpoint = "https://fal.run/fal-ai/kling-video/v3/standard/text-to-video";
-
-    if (model === "Kling Motion Control" || model === "Kling 3 Edit") {
-      videoEndpoint = "https://fal.run/fal-ai/kling-video/v3/standard/image-to-video";
-    }
-
-    const payload = {
-      prompt: prompt.trim(),
-      duration: duration || "5",
-      aspect_ratio: aspect_ratio || "16:9"
-    };
-
-    const response = await axios.post(videoEndpoint, payload, {
-      headers: {
-        Authorization: `Key ${process.env.FAL_KEY}`,
-        "Content-Type": "application/json"
+    const response = await axios.post(
+      "https://fal.run/fal-ai/kling-video",
+      { prompt },
+      {
+        headers: {
+          Authorization: `Key ${process.env.FAL_KEY}`,
+          "Content-Type": "application/json"
+        }
       }
+    );
+
+    res.json({
+      ok: true,
+      video: response.data.video?.url || response.data.output?.video_url,
+      credits: user.credits
     });
 
-    return res.json({
-      ok: true,
-      result: response.data
-    });
   } catch (err) {
-    console.error("VIDEO ERROR:", err.response?.data || err.message);
-    return res.status(500).json({
-      ok: false,
-      error: err.response?.data || err.message || "Video generation failed"
-    });
+    console.error(err.message);
+    res.status(500).json({ error: "Ошибка видео" });
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log("Server running on port", PORT);
+app.listen(PORT, () => {
+  console.log("Server started:", PORT);
 });
