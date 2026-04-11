@@ -3,24 +3,38 @@ import cors from "cors";
 
 const app = express();
 
-const PORT = process.env.PORT || 3000;
-const FAL_KEY = process.env.FAL_KEY;
+const PORT = Number(process.env.PORT || 3000);
+const HOST = "0.0.0.0";
+const FAL_KEY = process.env.FAL_KEY || "";
 
 app.use(cors());
 app.use(express.json({ limit: "20mb" }));
 
+app.use((req, res, next) => {
+  console.log(`[REQ] ${req.method} ${req.path}`);
+  next();
+});
+
 app.get("/", (req, res) => {
-  res.send("Backend работает 🚀");
+  res.status(200).send("Backend работает 🚀");
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true });
+  res.status(200).json({ ok: true, port: PORT });
+});
+
+app.options("/api/generate-image", (req, res) => {
+  res.sendStatus(204);
+});
+
+app.options("/api/generate-video", (req, res) => {
+  res.sendStatus(204);
 });
 
 function getImageEndpoint(model) {
   if (model === "Nano Banana Pro") return "fal-ai/nano-banana-pro";
   if (model === "Nano Banana 2") return "fal-ai/nano-banana-2";
-  throw new Error("Unsupported image model");
+  throw new Error(`Unsupported image model: ${model}`);
 }
 
 function getVideoEndpoint(model) {
@@ -31,7 +45,7 @@ function getVideoEndpoint(model) {
   if (model === "Veo 3 Lite") return "fal-ai/kling-video/v3/standard/text-to-video";
   if (model === "Veo 3 Fast") return "fal-ai/kling-video/v3/standard/text-to-video";
   if (model === "Veo 3 Quality") return "fal-ai/kling-video/v3/standard/text-to-video";
-  throw new Error("Unsupported video model");
+  throw new Error(`Unsupported video model: ${model}`);
 }
 
 async function falRequest(endpoint, payload) {
@@ -51,7 +65,7 @@ async function falRequest(endpoint, payload) {
   const data = await response.json();
 
   if (!response.ok) {
-    console.error("FAL ERROR:", data);
+    console.error("[FAL ERROR]", data);
     throw new Error(data?.detail || data?.error || "Fal request failed");
   }
 
@@ -70,22 +84,17 @@ app.post("/api/generate-image", async (req, res) => {
     }
 
     const endpoint = getImageEndpoint(model);
+    const data = await falRequest(endpoint, { prompt });
 
-    const payload = {
-      prompt
-    };
-
-    const data = await falRequest(endpoint, payload);
-
-    res.json({
+    return res.status(200).json({
       ok: true,
       type: "image",
       model,
       raw: data
     });
   } catch (error) {
-    console.error("generate-image error:", error);
-    res.status(500).json({
+    console.error("[generate-image]", error);
+    return res.status(500).json({
       ok: false,
       error: error.message || "generate-image failed"
     });
@@ -104,7 +113,6 @@ app.post("/api/generate-video", async (req, res) => {
     }
 
     const endpoint = getVideoEndpoint(model);
-
     const payload = {
       prompt,
       duration: duration || "5",
@@ -113,21 +121,29 @@ app.post("/api/generate-video", async (req, res) => {
 
     const data = await falRequest(endpoint, payload);
 
-    res.json({
+    return res.status(200).json({
       ok: true,
       type: "video",
       model,
       raw: data
     });
   } catch (error) {
-    console.error("generate-video error:", error);
-    res.status(500).json({
+    console.error("[generate-video]", error);
+    return res.status(500).json({
       ok: false,
       error: error.message || "generate-video failed"
     });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+app.use((err, req, res, next) => {
+  console.error("[UNCAUGHT EXPRESS ERROR]", err);
+  res.status(500).json({
+    ok: false,
+    error: "Internal server error"
+  });
+});
+
+app.listen(PORT, HOST, () => {
+  console.log(`Server running on http://${HOST}:${PORT}`);
 });
