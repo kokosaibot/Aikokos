@@ -1,3 +1,4 @@
+alert("APP V2 LOADED");
 console.log("APP V2 LOADED");
 
 const tg = window.Telegram?.WebApp;
