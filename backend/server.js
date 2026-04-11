@@ -1,149 +1,21 @@
-import express from "express";
-import cors from "cors";
+const express = require("express");
+const cors = require("cors");
 
 const app = express();
 
-const PORT = Number(process.env.PORT || 3000);
-const HOST = "0.0.0.0";
-const FAL_KEY = process.env.FAL_KEY || "";
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.json({ limit: "20mb" }));
-
-app.use((req, res, next) => {
-  console.log(`[REQ] ${req.method} ${req.path}`);
-  next();
-});
+app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.status(200).send("Backend работает 🚀");
+  res.send("Backend работает 🚀");
 });
 
 app.get("/health", (req, res) => {
-  res.status(200).json({ ok: true, port: PORT });
+  res.json({ ok: true });
 });
 
-app.options("/api/generate-image", (req, res) => {
-  res.sendStatus(204);
-});
-
-app.options("/api/generate-video", (req, res) => {
-  res.sendStatus(204);
-});
-
-function getImageEndpoint(model) {
-  if (model === "Nano Banana Pro") return "fal-ai/nano-banana-pro";
-  if (model === "Nano Banana 2") return "fal-ai/nano-banana-2";
-  throw new Error(`Unsupported image model: ${model}`);
-}
-
-function getVideoEndpoint(model) {
-  if (model === "Kling 3") return "fal-ai/kling-video/v3/standard/text-to-video";
-  if (model === "Kling Motion Control") return "fal-ai/kling-video/v3/standard/image-to-video";
-  if (model === "Kling 3 Edit") return "fal-ai/kling-video/v3/standard/image-to-video";
-  if (model === "Seedance 2.0") return "fal-ai/kling-video/v3/standard/text-to-video";
-  if (model === "Veo 3 Lite") return "fal-ai/kling-video/v3/standard/text-to-video";
-  if (model === "Veo 3 Fast") return "fal-ai/kling-video/v3/standard/text-to-video";
-  if (model === "Veo 3 Quality") return "fal-ai/kling-video/v3/standard/text-to-video";
-  throw new Error(`Unsupported video model: ${model}`);
-}
-
-async function falRequest(endpoint, payload) {
-  if (!FAL_KEY) {
-    throw new Error("FAL_KEY is missing in Railway Variables");
-  }
-
-  const response = await fetch(`https://fal.run/${endpoint}`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Key ${FAL_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    console.error("[FAL ERROR]", data);
-    throw new Error(data?.detail || data?.error || "Fal request failed");
-  }
-
-  return data;
-}
-
-app.post("/api/generate-image", async (req, res) => {
-  try {
-    const { prompt, model } = req.body;
-
-    if (!prompt || !model) {
-      return res.status(400).json({
-        ok: false,
-        error: "prompt and model are required"
-      });
-    }
-
-    const endpoint = getImageEndpoint(model);
-    const data = await falRequest(endpoint, { prompt });
-
-    return res.status(200).json({
-      ok: true,
-      type: "image",
-      model,
-      raw: data
-    });
-  } catch (error) {
-    console.error("[generate-image]", error);
-    return res.status(500).json({
-      ok: false,
-      error: error.message || "generate-image failed"
-    });
-  }
-});
-
-app.post("/api/generate-video", async (req, res) => {
-  try {
-    const { prompt, model, duration, aspect_ratio } = req.body;
-
-    if (!prompt || !model) {
-      return res.status(400).json({
-        ok: false,
-        error: "prompt and model are required"
-      });
-    }
-
-    const endpoint = getVideoEndpoint(model);
-    const payload = {
-      prompt,
-      duration: duration || "5",
-      aspect_ratio: aspect_ratio || "16:9"
-    };
-
-    const data = await falRequest(endpoint, payload);
-
-    return res.status(200).json({
-      ok: true,
-      type: "video",
-      model,
-      raw: data
-    });
-  } catch (error) {
-    console.error("[generate-video]", error);
-    return res.status(500).json({
-      ok: false,
-      error: error.message || "generate-video failed"
-    });
-  }
-});
-
-app.use((err, req, res, next) => {
-  console.error("[UNCAUGHT EXPRESS ERROR]", err);
-  res.status(500).json({
-    ok: false,
-    error: "Internal server error"
-  });
-});
-
-app.listen(PORT, HOST, () => {
-  console.log(`Server running on http://${HOST}:${PORT}`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log("Server running on port", PORT);
 });
