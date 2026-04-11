@@ -1,3 +1,4 @@
+const API_BASE = "https://aikokos-production.up.railway.app";
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
