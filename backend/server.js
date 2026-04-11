@@ -81,9 +81,13 @@ app.post("/api/generate-video", async (req, res) => {
 
     user.credits -= 8;
 
+    // ✅ РАБОЧИЙ эндпоинт (через fal queue)
     const response = await axios.post(
-      "https://fal.run/fal-ai/kling-video",
-      { prompt },
+      "https://queue.fal.run/fal-ai/kling-video/v1",
+      {
+        prompt: prompt,
+        duration: "5"
+      },
       {
         headers: {
           Authorization: `Key ${process.env.FAL_KEY}`,
@@ -94,16 +98,15 @@ app.post("/api/generate-video", async (req, res) => {
 
     res.json({
       ok: true,
-      video: response.data.video?.url || response.data.output?.video_url,
+      video: response.data?.video?.url || null,
       credits: user.credits
     });
 
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: "Ошибка видео" });
-  }
-});
+    console.error("VIDEO ERROR:", err.response?.data || err.message);
 
-app.listen(PORT, () => {
-  console.log("Server started:", PORT);
+    res.status(500).json({
+      error: err.response?.data || err.message
+    });
+  }
 });
