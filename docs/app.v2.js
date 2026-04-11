@@ -1,4 +1,3 @@
-alert("APP V2 LOADED");
 console.log("APP V2 LOADED");
 
 const tg = window.Telegram?.WebApp;
@@ -13,6 +12,7 @@ if (tg) {
 }
 
 const API_BASE = "https://aikokos-production.up.railway.app";
+const userId = tg?.initDataUnsafe?.user?.id || "test_user";
 
 const state = {
   currentScreen: "home",
@@ -62,6 +62,22 @@ function qs(selector) {
 
 function qsa(selector) {
   return Array.from(document.querySelectorAll(selector));
+}
+
+function updateCredits(value) {
+  const btn = qs("#openPricingBtn");
+  if (!btn) return;
+  btn.textContent = `Credits: ${value}`;
+}
+
+async function loadUser() {
+  try {
+    const response = await fetch(`${API_BASE}/api/user/${userId}`);
+    const data = await response.json();
+    updateCredits(data.credits);
+  } catch (e) {
+    console.error("loadUser error", e);
+  }
 }
 
 function ensureResultBlocks() {
@@ -367,7 +383,11 @@ async function generateImageReal(prompt, model) {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ prompt, model })
+    body: JSON.stringify({
+      prompt,
+      model,
+      userId
+    })
   });
 
   return await response.json();
@@ -383,7 +403,8 @@ async function generateVideoReal(prompt, model, duration, aspect_ratio) {
       prompt,
       model,
       duration,
-      aspect_ratio
+      aspect_ratio,
+      userId
     })
   });
 
@@ -392,6 +413,7 @@ async function generateVideoReal(prompt, model, duration, aspect_ratio) {
 
 function extractImageUrl(data) {
   return (
+    data?.image ||
     data?.result?.images?.[0]?.url ||
     data?.result?.image?.url ||
     data?.result?.output?.images?.[0]?.url ||
@@ -404,11 +426,12 @@ function extractImageUrl(data) {
 
 function extractVideoUrl(data) {
   return (
+    data?.video ||
+    data?.video_url ||
     data?.result?.video?.url ||
     data?.result?.videos?.[0]?.url ||
     data?.result?.output?.video?.url ||
     data?.result?.output?.videos?.[0]?.url ||
-    data?.video?.url ||
     data?.videos?.[0]?.url ||
     null
   );
@@ -441,6 +464,7 @@ function bindGenerators() {
 
       const imageUrl = extractImageUrl(data);
       renderImageResult(imageUrl);
+      if (typeof data.credits !== "undefined") updateCredits(data.credits);
 
       state.imageHistory.unshift({
         title: prompt.slice(0, 28),
@@ -490,6 +514,7 @@ function bindGenerators() {
 
       const videoUrl = extractVideoUrl(data);
       renderVideoResult(videoUrl);
+      if (typeof data.credits !== "undefined") updateCredits(data.credits);
 
       state.videoHistory.unshift({
         title: prompt.slice(0, 28),
@@ -597,6 +622,7 @@ function init() {
 
   renderHistory();
   showScreen("home");
+  loadUser();
 }
 
 document.addEventListener("DOMContentLoaded", init);
