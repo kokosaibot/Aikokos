@@ -17,7 +17,7 @@ const userId = tg?.initDataUnsafe?.user?.id || "test_user";
 const state = {
   currentScreen: "home",
   imageModel: "Nano Banana Pro",
-  videoModel: "Kling 3",
+  videoModel: "Kling 3.0",
   imageRatio: "Automatic",
   videoRatio: "16:9",
   duration: "5 sec",
@@ -31,9 +31,9 @@ const imageModels = [
 ];
 
 const videoModels = [
-  "Kling 3",
+  "Kling 3.0",
   "Kling Motion Control",
-  "Kling 3 Edit",
+  "Kling Edit",
   "Seedance 2.0",
   "Veo 3 Lite",
   "Veo 3 Fast",
@@ -74,10 +74,42 @@ async function loadUser() {
   try {
     const response = await fetch(`${API_BASE}/api/user/${userId}`);
     const data = await response.json();
-    updateCredits(data.credits);
+    if (data.ok) {
+      updateCredits(data.credits);
+      syncHistoryFromServer(data.history || []);
+    }
   } catch (e) {
     console.error("loadUser error", e);
   }
+}
+
+function syncHistoryFromServer(items) {
+  state.imageHistory = items
+    .filter((x) => x.type === "image")
+    .map((x) => ({
+      title: x.prompt?.slice(0, 28) || "image",
+      sub: x.model
+    }));
+
+  state.videoHistory = items
+    .filter((x) => x.type === "video")
+    .map((x) => ({
+      title: x.prompt?.slice(0, 28) || "video",
+      sub: x.model
+    }));
+
+  renderHistory();
+}
+
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve(null);
+
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 function ensureResultBlocks() {
@@ -377,15 +409,18 @@ function bindExpand() {
   });
 }
 
-async function generateImageReal(prompt, model) {
+async function generateImageReal({ prompt, model, aspectRatio, imageDataUrl }) {
   const response = await fetch(`${API_BASE}/api/generate-image`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "x-user-id": String(userId)
     },
     body: JSON.stringify({
       prompt,
       model,
+      aspectRatio,
+      imageDataUrl,
       userId
     })
   });
@@ -393,17 +428,27 @@ async function generateImageReal(prompt, model) {
   return await response.json();
 }
 
-async function generateVideoReal(prompt, model, duration, aspect_ratio) {
+async function generateVideoReal({
+  prompt,
+  model,
+  duration,
+  aspect_ratio,
+  startImageDataUrl,
+  endImageDataUrl
+}) {
   const response = await fetch(`${API_BASE}/api/generate-video`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "x-user-id": String(userId)
     },
     body: JSON.stringify({
       prompt,
       model,
       duration,
       aspect_ratio,
+      startImageDataUrl,
+      endImageDataUrl,
       userId
     })
   });
@@ -415,11 +460,7 @@ function extractImageUrl(data) {
   return (
     data?.image ||
     data?.result?.images?.[0]?.url ||
-    data?.result?.image?.url ||
-    data?.result?.output?.images?.[0]?.url ||
-    data?.result?.output?.[0]?.url ||
     data?.images?.[0]?.url ||
-    data?.output?.[0] ||
     null
   );
 }
@@ -429,9 +470,6 @@ function extractVideoUrl(data) {
     data?.video ||
     data?.video_url ||
     data?.result?.video?.url ||
-    data?.result?.videos?.[0]?.url ||
-    data?.result?.output?.video?.url ||
-    data?.result?.output?.videos?.[0]?.url ||
     data?.videos?.[0]?.url ||
     null
   );
@@ -440,6 +478,7 @@ function extractVideoUrl(data) {
 function bindGenerators() {
   qs("#generateImageBtn")?.addEventListener("click", async () => {
     const prompt = qs("#imagePrompt")?.value?.trim();
+    const imageFile = qs("#imageUpload")?.files?.[0] || null;
 
     if (!prompt) {
       showToast("Сначала напиши prompt");
@@ -452,14 +491,17 @@ function bindGenerators() {
     btn.disabled = true;
 
     try {
-      const data = await generateImageReal(prompt, state.imageModel);
+      const imageDataUrl = imageFile ? await fileToDataURL(imageFile) : null;
+
+      const data = await generateImageReal({
+        prompt,
+        model: state.imageModel,
+        aspectRatio: state.imageRatio,
+        imageDataUrl
+      });
 
       if (!data.ok) {
-        throw new Error(
-          typeof data.error === "string"
-            ? data.error
-            : JSON.stringify(data.error || "Image generation failed")
-        );
+        throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error || "Image generation failed"));
       }
 
       const imageUrl = extractImageUrl(data);
@@ -485,6 +527,8 @@ function bindGenerators() {
 
   qs("#generateVideoBtn")?.addEventListener("click", async () => {
     const prompt = qs("#videoPrompt")?.value?.trim();
+    const startFile = qs("#videoStartUpload")?.files?.[0] || null;
+    const endFile = qs("#videoEndUpload")?.files?.[0] || null;
 
     if (!prompt) {
       showToast("Сначала напиши prompt");
@@ -497,19 +541,20 @@ function bindGenerators() {
     btn.disabled = true;
 
     try {
-      const data = await generateVideoReal(
+      const startImageDataUrl = startFile ? await fileToDataURL(startFile) : null;
+      const endImageDataUrl = endFile ? await fileToDataURL(endFile) : null;
+
+      const data = await generateVideoReal({
         prompt,
-        state.videoModel,
-        state.duration.replace(" sec", ""),
-        state.videoRatio
-      );
+        model: state.videoModel,
+        duration: state.duration.replace(" sec", ""),
+        aspect_ratio: state.videoRatio,
+        startImageDataUrl,
+        endImageDataUrl
+      });
 
       if (!data.ok) {
-        throw new Error(
-          typeof data.error === "string"
-            ? data.error
-            : JSON.stringify(data.error || "Video generation failed")
-        );
+        throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error || "Video generation failed"));
       }
 
       const videoUrl = extractVideoUrl(data);
@@ -604,7 +649,7 @@ function showToast(text) {
   clearTimeout(showToast._timer);
   showToast._timer = setTimeout(() => {
     toast.style.opacity = "0";
-  }, 1800);
+  }, 2200);
 }
 
 function init() {
