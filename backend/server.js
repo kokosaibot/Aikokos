@@ -35,6 +35,10 @@ function getVideoEndpoint(model) {
 }
 
 async function falRequest(endpoint, payload) {
+  if (!FAL_KEY) {
+    throw new Error("FAL_KEY is missing in Railway Variables");
+  }
+
   const response = await fetch(`https://fal.run/${endpoint}`, {
     method: "POST",
     headers: {
@@ -45,9 +49,12 @@ async function falRequest(endpoint, payload) {
   });
 
   const data = await response.json();
+
   if (!response.ok) {
+    console.error("FAL ERROR:", data);
     throw new Error(data?.detail || data?.error || "Fal request failed");
   }
+
   return data;
 }
 
@@ -56,7 +63,10 @@ app.post("/api/generate-image", async (req, res) => {
     const { prompt, model } = req.body;
 
     if (!prompt || !model) {
-      return res.status(400).json({ error: "prompt and model are required" });
+      return res.status(400).json({
+        ok: false,
+        error: "prompt and model are required"
+      });
     }
 
     const endpoint = getImageEndpoint(model);
@@ -69,6 +79,7 @@ app.post("/api/generate-image", async (req, res) => {
 
     res.json({
       ok: true,
+      type: "image",
       model,
       raw: data
     });
@@ -86,7 +97,10 @@ app.post("/api/generate-video", async (req, res) => {
     const { prompt, model, duration, aspect_ratio } = req.body;
 
     if (!prompt || !model) {
-      return res.status(400).json({ error: "prompt and model are required" });
+      return res.status(400).json({
+        ok: false,
+        error: "prompt and model are required"
+      });
     }
 
     const endpoint = getVideoEndpoint(model);
@@ -101,6 +115,7 @@ app.post("/api/generate-video", async (req, res) => {
 
     res.json({
       ok: true,
+      type: "video",
       model,
       raw: data
     });
