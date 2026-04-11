@@ -1,10 +1,11 @@
-const API_BASE = "https://aikokos-production.up.railway.app";
 const tg = window.Telegram?.WebApp;
 
 if (tg) {
   tg.ready();
   tg.expand();
 }
+
+const API_BASE = "https://aikokos-production.up.railway.app";
 
 const state = {
   currentScreen: "home",
@@ -90,6 +91,7 @@ function closeModal(id) {
   const modal = qs(`#${id}`);
   if (!modal) return;
   modal.classList.add("hidden");
+
   const anyOpen = qsa(".modal-backdrop").some((m) => !m.classList.contains("hidden"));
   if (!anyOpen) {
     document.body.classList.remove("modal-open");
@@ -307,27 +309,122 @@ function bindExpand() {
   });
 }
 
-function bindGenerators() {
-  qs("#generateImageBtn")?.addEventListener("click", () => {
-    const prompt = qs("#imagePrompt").value.trim() || "без prompt";
-    state.imageHistory.unshift({
-      title: prompt.slice(0, 28),
-      sub: state.imageModel
-    });
-    state.imageHistory = state.imageHistory.slice(0, 9);
-    renderHistory();
-    showToast("Изображение добавлено в историю");
+async function generateImageReal(prompt, model) {
+  const response = await fetch(`${API_BASE}/api/generate-image`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      prompt,
+      model
+    })
   });
 
-  qs("#generateVideoBtn")?.addEventListener("click", () => {
-    const prompt = qs("#videoPrompt").value.trim() || "без prompt";
-    state.videoHistory.unshift({
-      title: prompt.slice(0, 28),
-      sub: `${state.videoModel} • ${state.duration}`
-    });
-    state.videoHistory = state.videoHistory.slice(0, 9);
-    renderHistory();
-    showToast("Видео-проект добавлен в историю");
+  const data = await response.json();
+  return data;
+}
+
+async function generateVideoReal(prompt, model, duration, aspect_ratio) {
+  const response = await fetch(`${API_BASE}/api/generate-video`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      prompt,
+      model,
+      duration,
+      aspect_ratio
+    })
+  });
+
+  const data = await response.json();
+  return data;
+}
+
+function bindGenerators() {
+  qs("#generateImageBtn")?.addEventListener("click", async () => {
+    const prompt = qs("#imagePrompt").value.trim();
+
+    if (!prompt) {
+      showToast("Сначала напиши prompt");
+      return;
+    }
+
+    const btn = qs("#generateImageBtn");
+    const oldText = btn.textContent;
+    btn.textContent = "Generating...";
+    btn.disabled = true;
+
+    try {
+      const data = await generateImageReal(prompt, state.imageModel);
+
+      if (!data.ok) {
+        throw new Error(data.error || "Image generation failed");
+      }
+
+      console.log("IMAGE RESULT:", data);
+
+      state.imageHistory.unshift({
+        title: prompt.slice(0, 28),
+        sub: state.imageModel
+      });
+      state.imageHistory = state.imageHistory.slice(0, 9);
+      renderHistory();
+
+      showToast("Картинка отправлена в генерацию");
+    } catch (error) {
+      console.error(error);
+      showToast(`Ошибка: ${error.message}`);
+    } finally {
+      btn.textContent = oldText;
+      btn.disabled = false;
+    }
+  });
+
+  qs("#generateVideoBtn")?.addEventListener("click", async () => {
+    const prompt = qs("#videoPrompt").value.trim();
+
+    if (!prompt) {
+      showToast("Сначала напиши prompt");
+      return;
+    }
+
+    const btn = qs("#generateVideoBtn");
+    const oldText = btn.textContent;
+    btn.textContent = "Generating...";
+    btn.disabled = true;
+
+    try {
+      const data = await generateVideoReal(
+        prompt,
+        state.videoModel,
+        state.duration.replace(" sec", ""),
+        state.videoRatio
+      );
+
+      if (!data.ok) {
+        throw new Error(data.error || "Video generation failed");
+      }
+
+      console.log("VIDEO RESULT:", data);
+
+      state.videoHistory.unshift({
+        title: prompt.slice(0, 28),
+        sub: `${state.videoModel} • ${state.duration}`
+      });
+      state.videoHistory = state.videoHistory.slice(0, 9);
+      renderHistory();
+
+      showToast("Видео отправлено в генерацию");
+    } catch (error) {
+      console.error(error);
+      showToast(`Ошибка: ${error.message}`);
+    } finally {
+      btn.textContent = oldText;
+      btn.disabled = false;
+    }
   });
 }
 
@@ -375,6 +472,7 @@ function bindProfile() {
 
 function showToast(text) {
   let toast = qs("#appToast");
+
   if (!toast) {
     toast = document.createElement("div");
     toast.id = "appToast";
@@ -389,6 +487,7 @@ function showToast(text) {
     toast.style.border = "1px solid rgba(255,255,255,0.08)";
     toast.style.color = "#f5f1ea";
     toast.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
+    toast.style.transition = "opacity 0.2s ease";
     document.body.appendChild(toast);
   }
 
