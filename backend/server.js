@@ -13,15 +13,12 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({
-    ok: true,
-    port: PORT
-  });
+  res.json({ ok: true, port: PORT });
 });
 
 app.post("/api/generate-image", async (req, res) => {
   try {
-    const { prompt } = req.body;
+    const { prompt, model } = req.body;
 
     if (!prompt || !prompt.trim()) {
       return res.status(400).json({
@@ -37,11 +34,14 @@ app.post("/api/generate-image", async (req, res) => {
       });
     }
 
+    const imageEndpoint =
+      model === "Nano Banana 2"
+        ? "https://fal.run/fal-ai/nano-banana-2"
+        : "https://fal.run/fal-ai/nano-banana";
+
     const response = await axios.post(
-      "https://fal.run/fal-ai/nano-banana",
-      {
-        prompt: prompt.trim()
-      },
+      imageEndpoint,
+      { prompt: prompt.trim() },
       {
         headers: {
           Authorization: `Key ${process.env.FAL_KEY}`,
@@ -55,11 +55,60 @@ app.post("/api/generate-image", async (req, res) => {
       result: response.data
     });
   } catch (err) {
-    console.error("FAL ERROR:", err.response?.data || err.message);
-
+    console.error("IMAGE ERROR:", err.response?.data || err.message);
     return res.status(500).json({
       ok: false,
-      error: err.response?.data || err.message || "Generation failed"
+      error: err.response?.data || err.message || "Image generation failed"
+    });
+  }
+});
+
+app.post("/api/generate-video", async (req, res) => {
+  try {
+    const { prompt, model, duration, aspect_ratio } = req.body;
+
+    if (!prompt || !prompt.trim()) {
+      return res.status(400).json({
+        ok: false,
+        error: "Prompt is required"
+      });
+    }
+
+    if (!process.env.FAL_KEY) {
+      return res.status(500).json({
+        ok: false,
+        error: "FAL_KEY is missing in Railway Variables"
+      });
+    }
+
+    let videoEndpoint = "https://fal.run/fal-ai/kling-video/v3/standard/text-to-video";
+
+    if (model === "Kling Motion Control" || model === "Kling 3 Edit") {
+      videoEndpoint = "https://fal.run/fal-ai/kling-video/v3/standard/image-to-video";
+    }
+
+    const payload = {
+      prompt: prompt.trim(),
+      duration: duration || "5",
+      aspect_ratio: aspect_ratio || "16:9"
+    };
+
+    const response = await axios.post(videoEndpoint, payload, {
+      headers: {
+        Authorization: `Key ${process.env.FAL_KEY}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    return res.json({
+      ok: true,
+      result: response.data
+    });
+  } catch (err) {
+    console.error("VIDEO ERROR:", err.response?.data || err.message);
+    return res.status(500).json({
+      ok: false,
+      error: err.response?.data || err.message || "Video generation failed"
     });
   }
 });
