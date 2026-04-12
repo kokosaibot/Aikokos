@@ -23,7 +23,6 @@
         <button class="topnav-link" data-screen="profile">Профиль</button>
         <button class="topnav-link" data-screen="enhance">Enhance</button>
       </nav>
-     
 
       <div class="topbar-right">
         <button class="credits-pill" id="openPricingBtn">Тарифы</button>
@@ -64,10 +63,14 @@
               <p>Nano Banana Pro / Nano Banana 2</p>
             </div>
           </button>
+
           <button class="create-card premium-card" data-go="enhance">
-  <div class="create-icon">⚡</div>
-  <div class="create-title">Enhance</div>
-</button>
+            <div class="create-icon">⚡</div>
+            <div>
+              <h3>Enhance</h3>
+              <p>Улучшение качества / AI upscale</p>
+            </div>
+          </button>
 
           <button class="create-card premium-card" data-go="video">
             <div class="create-icon">▶</div>
@@ -289,6 +292,79 @@
         </div>
       </section>
 
+      <!-- ENHANCE -->
+      <section class="screen" id="screen-enhance">
+        <div class="page-top">
+          <div>
+            <div class="section-kicker">Enhance</div>
+            <h2 class="page-title">Улучшение качества</h2>
+          </div>
+          <button class="library-btn" id="openHistoryEnhance">Библиотека</button>
+        </div>
+
+        <div class="form-card">
+          <div class="field">
+            <label>Режим</label>
+            <button class="selector-btn" id="enhanceModeBtn">
+              <span id="enhanceModeLabel">Фото upscale</span>
+              <span>⌄</span>
+            </button>
+          </div>
+
+          <div class="field">
+            <label>Загрузить файл</label>
+            <label class="upload-drop interactive">
+              <input type="file" id="enhanceUpload" accept="image/*,video/*" />
+              <span>Нажми или перетащи файл</span>
+            </label>
+            <div class="file-meta" id="enhanceUploadMeta">Файл не выбран</div>
+          </div>
+
+          <div class="field">
+            <label>Prompt / инструкция</label>
+            <textarea
+              id="enhancePrompt"
+              class="text-area"
+              placeholder="Например: improve sharpness, restore details, remove noise, keep natural texture..."
+            ></textarea>
+          </div>
+
+          <div class="field two-col">
+            <div>
+              <label>Масштаб</label>
+              <button class="selector-btn" id="enhanceScaleBtn">
+                <span id="enhanceScaleLabel">2x</span>
+                <span>⌄</span>
+              </button>
+            </div>
+
+            <div>
+              <label>Выход</label>
+              <button class="selector-btn" id="enhanceOutputBtn">
+                <span id="enhanceOutputLabel">PNG / MP4</span>
+                <span>⌄</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="sticky-generate">
+          <div class="generate-meta">
+            <span>1 результат</span>
+            <span>стоимость: 2 credits</span>
+          </div>
+          <button class="gold-btn strong-btn" id="generateEnhanceBtn">Enhance</button>
+        </div>
+
+        <div class="history-block">
+          <div class="section-head small-head">
+            <h3>История</h3>
+            <p>Последние улучшения</p>
+          </div>
+          <div class="history-grid" id="enhanceHistoryGrid"></div>
+        </div>
+      </section>
+
       <!-- TOOLS -->
       <section class="screen" id="screen-tools">
         <div class="section-head">
@@ -453,6 +529,6 @@
     </div>
   </div>
 
- <script src="./app.v2.js?v=2"></script>
+  <script src="./app.v2.js?v=2"></script>
 </body>
 </html>
