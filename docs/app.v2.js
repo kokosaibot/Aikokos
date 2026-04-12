@@ -25,11 +25,6 @@ const state = {
   videoRatio: "16:9",
   duration: "5 sec",
 
-  enhanceMode: "Фото upscale",
-  enhanceScale: "2x",
-  enhanceOutput: "PNG",
-  enhanceSize: "Original",
-
   imageHistory: [],
   videoHistory: [],
   enhanceHistory: []
@@ -65,23 +60,6 @@ const ratios = [
 ];
 
 const durations = ["5 sec", "8 sec", "10 sec", "12 sec"];
-
-const enhanceModes = [
-  "Фото upscale",
-  "Видео upscale (soon)",
-  "Remove noise (soon)",
-  "Restore details (soon)"
-];
-
-const enhanceScales = ["1.5x", "2x", "4x"];
-const enhanceOutputs = ["PNG", "JPG", "WEBP"];
-const enhanceSizes = [
-  "Original",
-  "512x512",
-  "1024x1024",
-  "1536x1536",
-  "2048x2048"
-];
 
 function qs(selector) {
   return document.querySelector(selector);
@@ -517,77 +495,6 @@ function renderDurationOptions() {
   });
 }
 
-function renderEnhancePickerOptions(type) {
-  const list = qs("#modelModalList");
-  const title = qs("#modelModalTitle");
-  if (!list || !title) return;
-
-  let options = [];
-  let selected = "";
-
-  if (type === "enhanceMode") {
-    title.textContent = "Выбор режима Enhance";
-    options = enhanceModes;
-    selected = state.enhanceMode;
-  } else if (type === "enhanceScale") {
-    title.textContent = "Выбор масштаба";
-    options = enhanceScales;
-    selected = state.enhanceScale;
-  } else if (type === "enhanceOutput") {
-    title.textContent = "Выбор формата выхода";
-    options = enhanceOutputs;
-    selected = state.enhanceOutput;
-  } else if (type === "enhanceSize") {
-    title.textContent = "Выбор размера";
-    options = enhanceSizes;
-    selected = state.enhanceSize;
-  }
-
-  list.innerHTML = options.map(
-    (item) => `
-      <button class="modal-option ${selected === item ? "selected" : ""}" data-enhance-picker="${type}" data-enhance-value="${item}">
-        <span>${escapeHtml(item)}</span>
-        <span>${selected === item ? "✓" : ""}</span>
-      </button>
-    `
-  ).join("");
-
-  qsa("[data-enhance-picker]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const value = btn.dataset.enhanceValue;
-      const pickerType = btn.dataset.enhancePicker;
-
-      if (pickerType === "enhanceMode") {
-        if (value.includes("(soon)")) {
-          showToast("🚧 Soon...");
-          closeModal("modelModal");
-          return;
-        }
-
-        state.enhanceMode = value;
-        if (qs("#enhanceModeLabel")) qs("#enhanceModeLabel").textContent = value;
-      }
-
-      if (pickerType === "enhanceScale") {
-        state.enhanceScale = value;
-        if (qs("#enhanceScaleLabel")) qs("#enhanceScaleLabel").textContent = value;
-      }
-
-      if (pickerType === "enhanceOutput") {
-        state.enhanceOutput = value;
-        if (qs("#enhanceOutputLabel")) qs("#enhanceOutputLabel").textContent = value;
-      }
-
-      if (pickerType === "enhanceSize") {
-        state.enhanceSize = value;
-        if (qs("#enhanceSizeLabel")) qs("#enhanceSizeLabel").textContent = value;
-      }
-
-      closeModal("modelModal");
-    });
-  });
-}
-
 function bindModals() {
   qs("#imageModelBtn")?.addEventListener("click", () => {
     renderModelOptions("image");
@@ -612,26 +519,6 @@ function bindModals() {
   qs("#durationBtn")?.addEventListener("click", () => {
     renderDurationOptions();
     openModal("durationModal");
-  });
-
-  qs("#enhanceModeBtn")?.addEventListener("click", () => {
-    renderEnhancePickerOptions("enhanceMode");
-    openModal("modelModal");
-  });
-
-  qs("#enhanceScaleBtn")?.addEventListener("click", () => {
-    renderEnhancePickerOptions("enhanceScale");
-    openModal("modelModal");
-  });
-
-  qs("#enhanceOutputBtn")?.addEventListener("click", () => {
-    renderEnhancePickerOptions("enhanceOutput");
-    openModal("modelModal");
-  });
-
-  qs("#enhanceSizeBtn")?.addEventListener("click", () => {
-    renderEnhancePickerOptions("enhanceSize");
-    openModal("modelModal");
   });
 
   qsa("[data-close]").forEach((btn) => {
@@ -718,10 +605,7 @@ async function generateVideoReal({
   return await response.json();
 }
 
-async function enhanceFileReal({
-  fileDataUrl,
-  mimeType
-}) {
+async function enhanceFileReal({ fileDataUrl, mimeType }) {
   const response = await fetch(`${API_BASE}/api/enhance`, {
     method: "POST",
     headers: {
@@ -881,13 +765,8 @@ function bindGenerators() {
   qs("#generateEnhanceBtn")?.addEventListener("click", async () => {
     const file = qs("#enhanceUpload")?.files?.[0] || null;
 
-    if (state.enhanceMode !== "Фото upscale") {
-      showToast("🚧 Soon...");
-      return;
-    }
-
     if (!file) {
-      showToast("Сначала загрузи файл");
+      showToast("Сначала загрузи фото");
       return;
     }
 
@@ -917,6 +796,8 @@ function bindGenerators() {
         resultUrl: resultUrl || fileDataUrl,
         isFallback
       });
+
+      if (typeof data.credits !== "undefined") updateCredits(data.credits);
 
       state.enhanceHistory.unshift({
         title: "Photo enhance",
@@ -1033,10 +914,6 @@ function init() {
   if (qs("#ratioImageLabel")) qs("#ratioImageLabel").textContent = state.imageRatio;
   if (qs("#ratioVideoLabel")) qs("#ratioVideoLabel").textContent = state.videoRatio;
   if (qs("#durationLabel")) qs("#durationLabel").textContent = state.duration;
-  if (qs("#enhanceModeLabel")) qs("#enhanceModeLabel").textContent = state.enhanceMode;
-  if (qs("#enhanceScaleLabel")) qs("#enhanceScaleLabel").textContent = state.enhanceScale;
-  if (qs("#enhanceOutputLabel")) qs("#enhanceOutputLabel").textContent = state.enhanceOutput;
-  if (qs("#enhanceSizeLabel")) qs("#enhanceSizeLabel").textContent = state.enhanceSize;
 
   renderHistory();
   showScreen("home");
