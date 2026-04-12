@@ -6,10 +6,10 @@ import { fal } from "@fal-ai/client";
 const app = express();
 const PORT = Number(process.env.PORT || 8080);
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 fal.config({
   credentials: process.env.FAL_KEY
@@ -119,6 +119,40 @@ async function refundCredits(userId, amount) {
 
   if (error) throw error;
   return data.credits;
+}
+
+async function spendEnhanceCredits(userId, amount) {
+  const user = await getUser(userId);
+
+  if (user.enhance_credits < amount) {
+    throw new Error(`Enhance кредиты закончились. Нужно ${amount}, доступно ${user.enhance_credits}`);
+  }
+
+  const nextCredits = user.enhance_credits - amount;
+
+  const { data, error } = await supabase
+    .from("app_users")
+    .update({ enhance_credits: nextCredits })
+    .eq("id", String(userId))
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data.enhance_credits;
+}
+
+async function refundEnhanceCredits(userId, amount) {
+  const user = await getUser(userId);
+
+  const { data, error } = await supabase
+    .from("app_users")
+    .update({ enhance_credits: user.enhance_credits + amount })
+    .eq("id", String(userId))
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data.enhance_credits;
 }
 
 async function addHistory(userId, item) {
@@ -374,7 +408,10 @@ app.get("/", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({ ok: true, port: PORT });
+  res.json({
+    ok: true,
+    port: PORT
+  });
 });
 
 app.get("/api/user/:id", async (req, res) => {
@@ -389,11 +426,82 @@ app.get("/api/user/:id", async (req, res) => {
       ok: true,
       id: user.id,
       credits: user.credits,
+      enhance_credits: user.enhance_credits,
       history
     });
   } catch (error) {
     console.error("GET USER ERROR:", error);
-    res.status(500).json({ ok: false, error: error.message || "User fetch failed" });
+    res.status(500).json({
+      ok: false,
+      error: error?.message || "User fetch failed"
+    });
+  }
+});
+
+app.post("/api/enhance-image", async (req, res) => {
+  const {
+    model = "Nano Banana Pro",
+    imageDataUrl,
+    userId = "test_user",
+    profile = {}
+  } = req.body;
+
+  if (!imageDataUrl) {
+    return res.status(400).json({
+      ok: false,
+      error: "Image is required"
+    });
+  }
+
+  if (!process.env.FAL_KEY) {
+    return res.status(500).json({
+      ok: false,
+      error: "FAL_KEY is missing in Railway Variables"
+    });
+  }
+
+  // вшитый prompt
+  const enhancePrompt ="enhance this image to ultra high quality, restore realistic details, sharpen focus, improve lighting, reduce blur and noise, clean artifacts, increase clarity, professional photography, 8k quality, keep the same composition and subject, do not change identity, do not add new objects";
+
+  try {
+    await ensureUser(userId, profile);
+    const enhanceCreditsAfterSpend = await spendEnhanceCredits(userId, 1);
+
+    const endpoint = imageModelToEndpoint(model, true);
+    const input = {
+      prompt: enhancePrompt,
+      image_urls: [imageDataUrl],
+      aspect_ratio: "1:1"
+    };
+
+    const data = await runFal(endpoint, input);
+    const imageUrl = extractImageUrl(data);
+
+    await addHistory(userId, {
+      type: "image",
+      model:edits,
+      enhance
+      prompt: "[ENHANCE BUILT-IN PROMPT]",
+      cost: 1,
+      resultUrl: imageUrl,
+      meta: { enhance: true }
+    });
+
+    return res.json({
+      ok: true,
+      image: imageUrl,
+      enhance_credits: enhanceCreditsAfterSpend,
+      raw: data
+    });
+  } catch (error) {
+    try {
+      await refundEnhanceCredits(userId, 1);
+    } catch {}
+    console.error("ENHANCE ERROR:", error);
+    return res.status(500).json({
+      ok: false,
+      error: error?.message || "Enhance failed"
+    });
   }
 });
 
@@ -448,8 +556,7 @@ app.post("/api/generate-image", async (req, res) => {
       ok: true,
       model,
       image: imageUrl,
-      credits: creditsAfterSpend,
-      raw: data
+      credits: creditsAfterSpend
     });
   } catch (error) {
     try {
@@ -513,10 +620,8 @@ app.post("/api/generate-video", async (req, res) => {
       ok: true,
       model,
       video: videoUrl,
-      credits: creditsAfterSpend,
-      raw: data
-    });
-  } catch (error) {
+      credits: creditsAfterSpend
+    });} catch (error) {
     try {
       await refundCredits(userId, 8);
     } catch {}
