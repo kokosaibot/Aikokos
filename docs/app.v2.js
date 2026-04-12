@@ -12,7 +12,8 @@ if (tg) {
 }
 
 const API_BASE = "https://aikokos-production.up.railway.app";
-const userId = tg?.initDataUnsafe?.user?.id || "test_user";
+const tgUser = tg?.initDataUnsafe?.user || null;
+const userId = tgUser?.id || "test_user";
 
 const state = {
   currentScreen: "home",
@@ -70,19 +71,6 @@ function updateCredits(value) {
   btn.textContent = `Credits: ${value}`;
 }
 
-async function loadUser() {
-  try {
-    const response = await fetch(`${API_BASE}/api/user/${userId}`);
-    const data = await response.json();
-    if (data.ok) {
-      updateCredits(data.credits);
-      syncHistoryFromServer(data.history || []);
-    }
-  } catch (e) {
-    console.error("loadUser error", e);
-  }
-}
-
 function syncHistoryFromServer(items) {
   state.imageHistory = items
     .filter((x) => x.type === "image")
@@ -99,6 +87,19 @@ function syncHistoryFromServer(items) {
     }));
 
   renderHistory();
+}
+
+async function loadUser() {
+  try {
+    const response = await fetch(`${API_BASE}/api/user/${userId}`);
+    const data = await response.json();
+    if (data.ok) {
+      updateCredits(data.credits);
+      syncHistoryFromServer(data.history || []);
+    }
+  } catch (e) {
+    console.error("loadUser error", e);
+  }
 }
 
 function fileToDataURL(file) {
@@ -421,7 +422,12 @@ async function generateImageReal({ prompt, model, aspectRatio, imageDataUrl }) {
       model,
       aspectRatio,
       imageDataUrl,
-      userId
+      userId,
+      profile: {
+        username: tgUser?.username || null,
+        first_name: tgUser?.first_name || null,
+        last_name: tgUser?.last_name || null
+      }
     })
   });
 
@@ -449,7 +455,12 @@ async function generateVideoReal({
       aspect_ratio,
       startImageDataUrl,
       endImageDataUrl,
-      userId
+      userId,
+      profile: {
+        username: tgUser?.username || null,
+        first_name: tgUser?.first_name || null,
+        last_name: tgUser?.last_name || null
+      }
     })
   });
 
