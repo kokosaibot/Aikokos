@@ -75,14 +75,21 @@ const enhanceModes = [
 const enhanceScales = ["1.5x", "2x", "4x"];
 const enhanceOutputs = ["PNG / MP4", "PNG", "JPG", "WEBP", "MP4"];
 
-let activePickerType = null;
-
 function qs(selector) {
   return document.querySelector(selector);
 }
 
 function qsa(selector) {
   return Array.from(document.querySelectorAll(selector));
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function updateCredits(value) {
@@ -240,8 +247,8 @@ function renderHistory() {
       ? state.imageHistory.map(
           (item) => `
             <div class="history-item interactive">
-              <small>${item.sub}</small>
-              <strong>${item.title}</strong>
+              <small>${escapeHtml(item.sub)}</small>
+              <strong>${escapeHtml(item.title)}</strong>
             </div>
           `
         ).join("")
@@ -253,8 +260,8 @@ function renderHistory() {
       ? state.videoHistory.map(
           (item) => `
             <div class="history-item interactive">
-              <small>${item.sub}</small>
-              <strong>${item.title}</strong>
+              <small>${escapeHtml(item.sub)}</small>
+              <strong>${escapeHtml(item.title)}</strong>
             </div>
           `
         ).join("")
@@ -266,13 +273,21 @@ function renderHistory() {
       ? state.enhanceHistory.map(
           (item) => `
             <div class="history-item interactive">
-              <small>${item.sub}</small>
-              <strong>${item.title}</strong>
+              <small>${escapeHtml(item.sub)}</small>
+              <strong>${escapeHtml(item.title)}</strong>
             </div>
           `
         ).join("")
       : `<div style="color:#9c958d;">История enhance пока пустая</div>`;
   }
+}
+
+function buildDownloadButton(url, fileName) {
+  return `
+    <a href="${url}" download="${fileName}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
+      <button class="gold-btn" style="margin-top:12px;">Скачать</button>
+    </a>
+  `;
 }
 
 function renderImageResult(url) {
@@ -285,8 +300,13 @@ function renderImageResult(url) {
   }
 
   block.innerHTML = `
-    <div style="width:100%;">
-      <img src="${url}" alt="result" style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;" />
+    <div style="width:100%;text-align:center;">
+      <img
+        src="${url}"
+        alt="result"
+        style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"
+      />
+      ${buildDownloadButton(url, "image-result.png")}
     </div>
   `;
 }
@@ -301,35 +321,94 @@ function renderVideoResult(url) {
   }
 
   block.innerHTML = `
-    <div style="width:100%;">
-      <video src="${url}" controls playsinline style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"></video>
+    <div style="width:100%;text-align:center;">
+      <video
+        src="${url}"
+        controls
+        playsinline
+        style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"
+      ></video>
+      ${buildDownloadButton(url, "video-result.mp4")}
     </div>
   `;
 }
 
-function renderEnhanceResult(url, fileType = "image") {
+function renderEnhanceResult({ originalUrl, resultUrl, fileType = "image", isFallback = false }) {
   const block = qs("#enhanceResultContent");
   if (!block) return;
 
-  if (!url) {
+  if (!resultUrl) {
     block.innerHTML = "⚠️ Нет результата в ответе";
     return;
   }
 
-  const isVideo = fileType === "video" || /\.mp4(\?|$)/i.test(url);
+  const isVideo = fileType === "video" || /\.mp4(\?|$)/i.test(resultUrl);
+  const sameAsOriginal = originalUrl && resultUrl === originalUrl;
 
   if (isVideo) {
     block.innerHTML = `
+      <div style="width:100%;text-align:center;">
+        <div style="margin-bottom:10px;color:#c8c1b8;">
+          ${isFallback || sameAsOriginal ? "Показан исходный файл. Реальный enhance с сервера не пришёл." : "Результат enhance готов."}
+        </div>
+        <video
+          src="${resultUrl}"
+          controls
+          playsinline
+          style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"
+        ></video>
+        ${buildDownloadButton(resultUrl, "enhanced-video.mp4")}
+      </div>
+    `;
+    return;
+  }
+
+  if (!sameAsOriginal && originalUrl) {
+    block.innerHTML = `
       <div style="width:100%;">
-        <video src="${url}" controls playsinline style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"></video>
+        <div style="margin-bottom:12px;color:#c8c1b8;text-align:center;">
+          Сравнение до и после
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+          <div>
+            <div style="margin-bottom:8px;color:#9c958d;text-align:center;">До</div>
+            <img
+              src="${originalUrl}"
+              alt="before"
+              style="width:100%;display:block;border-radius:18px;"
+            />
+          </div>
+
+          <div>
+            <div style="margin-bottom:8px;color:#9c958d;text-align:center;">После</div>
+            <img
+              src="${resultUrl}"
+              alt="after"
+              style="width:100%;display:block;border-radius:18px;"
+            />
+          </div>
+        </div>
+
+        <div style="text-align:center;">
+          ${buildDownloadButton(resultUrl, "enhanced-image.png")}
+        </div>
       </div>
     `;
     return;
   }
 
   block.innerHTML = `
-    <div style="width:100%;">
-      <img src="${url}" alt="enhanced-result" style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;" />
+    <div style="width:100%;text-align:center;">
+      <div style="margin-bottom:10px;color:#c8c1b8;">
+        ${isFallback || sameAsOriginal ? "Сервер не вернул отдельный улучшенный файл. Сейчас показан исходник." : "Результат enhance готов."}
+      </div>
+      <img
+        src="${resultUrl}"
+        alt="enhanced-result"
+        style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"
+      />
+      ${buildDownloadButton(resultUrl, "enhanced-image.png")}
     </div>
   `;
 }
@@ -371,7 +450,7 @@ function renderModelOptions(type) {
   list.innerHTML = models.map(
     (model) => `
       <button class="modal-option ${selected === model ? "selected" : ""}" data-model-type="${type}" data-model-value="${model}">
-        <span>${model}</span>
+        <span>${escapeHtml(model)}</span>
         <span>${selected === model ? "✓" : ""}</span>
       </button>
     `
@@ -403,7 +482,7 @@ function renderRatioOptions(type) {
   list.innerHTML = ratios.map(
     (ratio) => `
       <button class="modal-option ${selected === ratio ? "selected" : ""}" data-ratio-type="${type}" data-ratio-value="${ratio}">
-        <span>${ratio}</span>
+        <span>${escapeHtml(ratio)}</span>
         <span>${selected === ratio ? "✓" : ""}</span>
       </button>
     `
@@ -433,7 +512,7 @@ function renderDurationOptions() {
   list.innerHTML = durations.map(
     (item) => `
       <button class="modal-option ${state.duration === item ? "selected" : ""}" data-duration-value="${item}">
-        <span>${item}</span>
+        <span>${escapeHtml(item)}</span>
         <span>${state.duration === item ? "✓" : ""}</span>
       </button>
     `
@@ -474,7 +553,7 @@ function renderEnhancePickerOptions(type) {
   list.innerHTML = options.map(
     (item) => `
       <button class="modal-option ${selected === item ? "selected" : ""}" data-enhance-picker="${type}" data-enhance-value="${item}">
-        <span>${item}</span>
+        <span>${escapeHtml(item)}</span>
         <span>${selected === item ? "✓" : ""}</span>
       </button>
     `
@@ -532,20 +611,17 @@ function bindModals() {
   });
 
   qs("#enhanceModeBtn")?.addEventListener("click", () => {
-    activePickerType = "enhanceMode";
-    renderEnhancePickerOptions(activePickerType);
+    renderEnhancePickerOptions("enhanceMode");
     openModal("modelModal");
   });
 
   qs("#enhanceScaleBtn")?.addEventListener("click", () => {
-    activePickerType = "enhanceScale";
-    renderEnhancePickerOptions(activePickerType);
+    renderEnhancePickerOptions("enhanceScale");
     openModal("modelModal");
   });
 
   qs("#enhanceOutputBtn")?.addEventListener("click", () => {
-    activePickerType = "enhanceOutput";
-    renderEnhancePickerOptions(activePickerType);
+    renderEnhancePickerOptions("enhanceOutput");
     openModal("modelModal");
   });
 
@@ -826,6 +902,7 @@ function bindGenerators() {
       const isVideo = mimeType.startsWith("video/");
 
       let data = null;
+      let isFallback = false;
 
       try {
         data = await enhanceFileReal({
@@ -838,15 +915,20 @@ function bindGenerators() {
         });
       } catch (apiError) {
         console.warn("Enhance API fallback:", apiError);
+        isFallback = true;
       }
 
-      let resultUrl = extractEnhanceUrl(data);
-
-      if (!resultUrl) {
-        resultUrl = fileDataUrl;
+      const resultUrl = extractEnhanceUrl(data) || fileDataUrl;
+      if (!extractEnhanceUrl(data)) {
+        isFallback = true;
       }
 
-      renderEnhanceResult(resultUrl, isVideo ? "video" : "image");
+      renderEnhanceResult({
+        originalUrl: fileDataUrl,
+        resultUrl,
+        fileType: isVideo ? "video" : "image",
+        isFallback
+      });
 
       if (data && typeof data.credits !== "undefined") {
         updateCredits(data.credits);
@@ -859,7 +941,11 @@ function bindGenerators() {
       state.enhanceHistory = state.enhanceHistory.slice(0, 9);
       renderHistory();
 
-      showToast(data?.ok === false ? "Результат показан локально" : "Enhance готов");
+      if (isFallback) {
+        showToast("Сервер не вернул отдельный enhance-файл");
+      } else {
+        showToast("Enhance готов");
+      }
     } catch (error) {
       console.error(error);
       showToast(`Ошибка: ${error.message}`);
