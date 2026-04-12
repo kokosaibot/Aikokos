@@ -438,69 +438,69 @@ app.get("/api/user/:id", async (req, res) => {
   }
 });
 
-app.post("/api/enhance-image", async (req, res) => {
-  const {
-    model = "Nano Banana Pro",
-    imageDataUrl,
-    userId = "test_user",
-    profile = {}
-  } = req.body;
-
-  if (!imageDataUrl) {
-    return res.status(400).json({
-      ok: false,
-      error: "Image is required"
-    });
-  }
-
-  if (!process.env.FAL_KEY) {
-    return res.status(500).json({
-      ok: false,
-      error: "FAL_KEY is missing in Railway Variables"
-    });
-  }
-
-  // вшитый prompt
-  const enhancePrompt =
-    "enhance this image to ultra high quality, restore realistic details, sharpen focus, improve lighting, reduce blur and noise, clean artifacts, increase clarity, professional photography, 8k quality, keep the same composition and subject, do not change identity, do not add new objects";
-
+app.post("/api/enhance", async (req, res) => {
   try {
-    await ensureUser(userId, profile);
-    const enhanceCreditsAfterSpend = await spendEnhanceCredits(userId, 1);
+    const { fileDataUrl, mimeType } = req.body || {};
 
-    const endpoint = imageModelToEndpoint(model, true);
-    const input = {
-      prompt: enhancePrompt,
-      image_urls: [imageDataUrl],
-      aspect_ratio: "1:1"
-    };
+    if (!fileDataUrl) {
+      return res.status(400).json({
+        ok: false,
+        error: "fileDataUrl is required"
+      });
+    }
 
-    const data = await runFal(endpoint, input);
-    const imageUrl = extractImageUrl(data);
+    if (!mimeType || !mimeType.startsWith("image/")) {
+      return res.status(400).json({
+        ok: false,
+        error: "Only image is supported now"
+      });
+    }
 
-    await addHistory(userId, {
-      type: "image",
-      model: `${model} Enhance`,
-      prompt: "[ENHANCE BUILT-IN PROMPT]",
-      cost: 1,
-      resultUrl: imageUrl,
-      meta: { enhance: true }
+    const HIDDEN_PROMPT = [
+      "Enhance this photo into a higher-quality realistic version.",
+      "Preserve the same subject, same composition, same angle, same identity, same clothing, same scene.",
+      "Improve sharpness, lighting balance, reflections, micro-details, and overall clarity.",
+      "Keep it natural, premium, photorealistic, clean, and detailed.",
+      "Do not change the person, car, pose, framing, or background drastically.",
+      "No extra objects, no stylization, no text, no watermark."
+    ].join(" ");
+
+    const imageUrl = await fal.storage.upload(fileDataUrl);
+
+    const result = await fal.subscribe("fal-ai/nano-banana-2/edit", {
+      input: {
+        prompt: HIDDEN_PROMPT,
+        image_urls: [imageUrl],
+        output_format: "png",
+        aspect_ratio: "1:1"
+      },
+      logs: true
     });
+
+    const resultUrl =
+      result?.data?.images?.[0]?.url ||
+      result?.data?.image?.url ||
+      result?.images?.[0]?.url ||
+      result?.image?.url ||
+      null;
+
+    if (!resultUrl) {
+      return res.status(500).json({
+        ok: false,
+        error: "Nano Banana 2 returned no image URL",
+        raw: result?.data || result || null
+      });
+    }
 
     return res.json({
       ok: true,
-      image: imageUrl,
-      enhance_credits: enhanceCreditsAfterSpend,
-      raw: data
+      result_url: resultUrl
     });
   } catch (error) {
-    try {
-      await refundEnhanceCredits(userId, 1);
-    } catch {}
-    console.error("ENHANCE ERROR:", error);
+    console.error("Enhance error:", error);
     return res.status(500).json({
       ok: false,
-      error: error?.message || "Enhance failed"
+      error: error.message || "Enhance server error"
     });
   }
 });
