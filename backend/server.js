@@ -1,9 +1,15 @@
 import express from "express";
 import cors from "cors";
+import { createClient } from "@supabase/supabase-js";
 import { fal } from "@fal-ai/client";
 
 const app = express();
 const PORT = Number(process.env.PORT || 8080);
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 fal.config({
   credentials: process.env.FAL_KEY
@@ -15,53 +21,10 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "x-user-id"]
 }));
 app.options("*", cors());
-app.use(express.json({ limit: "25mb" }));
-
-// ---------------------------
-// TEMP IN-MEMORY STORE
-// ---------------------------
-const users = new Map();
-
-function getUser(userId = "test_user") {
-  if (!users.has(userId)) {
-    users.set(userId, {
-      id: userId,
-      credits: 50,
-      history: []
-    });
-  }
-  return users.get(userId);
-}
-
-function addHistory(userId, item) {
-  const user = getUser(userId);
-  user.history.unshift({
-    id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    createdAt: new Date().toISOString(),
-    ...item
-  });
-  user.history = user.history.slice(0, 50);
-}
-
-function spendCredits(userId, amount) {
-  const user = getUser(userId);
-
-  if (user.credits < amount) {
-    throw new Error(`Недостаточно кредитов. Нужно ${amount}, доступно ${user.credits}`);
-  }
-
-  user.credits -= amount;
-  return user.credits;
-}
-
-function refundCredits(userId, amount) {
-  const user = getUser(userId);
-  user.credits += amount;
-  return user.credits;
-}
+app.use(express.json({ limit: "30mb" }));
 
 function normalizeAspectRatio(ratio, fallback = "16:9") {
-  if (!ratio || ratio === "Automatic" || ratio === "auto") return "auto";
+  if (!ratio || ratio === "Automatic" || ratio === "auto") return fallback;
   return ratio;
 }
 
@@ -89,12 +52,107 @@ function normalizeSeedanceDuration(duration) {
   return Math.max(4, Math.min(15, Math.round(n)));
 }
 
+async function ensureUser(userId, profile = {}) {
+  const payload = {
+    id: String(userId),
+    username: profile.username || null,
+    first_name: profile.first_name || null,
+    last_name: profile.last_name || null
+  };
+
+  const { error } = await supabase
+    .from("app_users")
+    .upsert(payload, { onConflict: "id" });
+
+  if (error) throw error;
+
+  const { data, error: fetchError } = await supabase
+    .from("app_users")
+    .select("*")
+    .eq("id", String(userId))
+    .single();
+
+  if (fetchError) throw fetchError;
+  return data;
+}
+
+async function getUser(userId) {
+  const { data, error } = await supabase
+    .from("app_users")
+    .select("*")
+    .eq("id", String(userId))
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function spendCredits(userId, amount) {
+  const user = await getUser(userId);
+
+  if (user.credits < amount) {
+    throw new Error(`Недостаточно кредитов. Нужно ${amount}, доступно ${user.credits}`);
+  }
+
+  const nextCredits = user.credits - amount;
+
+  const { data, error } = await supabase
+    .from("app_users")
+    .update({ credits: nextCredits })
+    .eq("id", String(userId))
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data.credits;
+}
+
+async function refundCredits(userId, amount) {
+  const user = await getUser(userId);
+
+  const { data, error } = await supabase
+    .from("app_users")
+    .update({ credits: user.credits + amount })
+    .eq("id", String(userId))
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data.credits;
+}
+
+async function addHistory(userId, item) {
+  const { error } = await supabase
+    .from("generations")
+    .insert({
+      user_id: String(userId),
+      type: item.type,
+      model: item.model,
+      prompt: item.prompt,
+      cost: item.cost,
+      result_url: item.resultUrl || null,
+      meta: item.meta || {}
+    });
+
+  if (error) throw error;
+}
+
+async function getHistory(userId) {
+  const { data, error } = await supabase
+    .from("generations")
+    .select("*")
+    .eq("user_id", String(userId))
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+  return data;
+}
+
 function imageModelToEndpoint(model, hasImage) {
   if (model === "Nano Banana Pro") {
     return hasImage ? "fal-ai/nano-banana-pro/edit" : "fal-ai/nano-banana-pro";
   }
-
-  // UI label "Nano Banana 2" → current fal endpoint "fal-ai/nano-banana"
   return hasImage ? "fal-ai/nano-banana/edit" : "fal-ai/nano-banana";
 }
 
@@ -137,8 +195,8 @@ async function runFal(endpoint, input) {
 function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDataUrl, endImageDataUrl, userId }) {
   const hasStart = Boolean(startImageDataUrl);
   const hasEnd = Boolean(endImageDataUrl);
-  const ratio = normalizeAspectRatio(aspect_ratio);
-  const basePrompt = prompt?.trim();
+  const ratio = normalizeAspectRatio(aspect_ratio, "16:9");
+  const basePrompt = String(prompt).trim();
 
   switch (model) {
     case "Kling 3.0": {
@@ -150,7 +208,7 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
             image_url: startImageDataUrl,
             ...(hasEnd ? { end_image_url: endImageDataUrl } : {}),
             duration: normalizeKlingDuration(duration),
-            aspect_ratio: ratio === "auto" ? "16:9" : ratio,
+            aspect_ratio: ratio,
             generate_audio: false
           }
         };
@@ -161,7 +219,7 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
         input: {
           prompt: basePrompt,
           duration: normalizeKlingDuration(duration),
-          aspect_ratio: ratio === "auto" ? "16:9" : ratio,
+          aspect_ratio: ratio,
           generate_audio: false
         }
       };
@@ -169,7 +227,7 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
 
     case "Kling Motion Control": {
       if (!hasStart) {
-        throw new Error("Для Kling Motion Control загрузи хотя бы start frame");
+        throw new Error("Для Kling Motion Control загрузи start frame");
       }
 
       return {
@@ -179,7 +237,7 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
           start_image_url: startImageDataUrl,
           ...(hasEnd ? { image_urls: [endImageDataUrl] } : {}),
           duration: normalizeKlingDuration(duration),
-          aspect_ratio: ratio === "auto" ? "16:9" : ratio,
+          aspect_ratio: ratio,
           generate_audio: false
         }
       };
@@ -190,7 +248,6 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
         throw new Error("Для Kling Edit загрузи start frame");
       }
 
-      // true video edit on fal needs video_url; your current UI uses images
       return {
         endpoint: "fal-ai/kling-video/o3/pro/image-to-video",
         input: {
@@ -198,7 +255,7 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
           image_url: startImageDataUrl,
           ...(hasEnd ? { end_image_url: endImageDataUrl } : {}),
           duration: normalizeKlingDuration(duration),
-          aspect_ratio: ratio === "auto" ? "16:9" : ratio,
+          aspect_ratio: ratio,
           generate_audio: false
         }
       };
@@ -251,7 +308,7 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
         endpoint: "fal-ai/veo3/fast",
         input: {
           prompt: basePrompt,
-          aspect_ratio: ratio === "auto" ? "16:9" : ratio,
+          aspect_ratio: ratio,
           duration: normalizeVeoDuration(duration),
           resolution: "720p",
           generate_audio: false
@@ -276,7 +333,7 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
         endpoint: "fal-ai/veo3/fast",
         input: {
           prompt: basePrompt,
-          aspect_ratio: ratio === "auto" ? "16:9" : ratio,
+          aspect_ratio: ratio,
           duration: normalizeVeoDuration(duration),
           resolution: "720p",
           generate_audio: false
@@ -302,7 +359,7 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
         endpoint: "fal-ai/veo3",
         input: {
           prompt: basePrompt,
-          aspect_ratio: ratio === "auto" ? "16:9" : ratio,
+          aspect_ratio: ratio,
           duration: normalizeVeoDuration(duration),
           resolution: "1080p",
           generate_audio: false
@@ -312,9 +369,6 @@ function buildVideoRequest({ model, prompt, duration, aspect_ratio, startImageDa
   }
 }
 
-// ---------------------------
-// ROUTES
-// ---------------------------
 app.get("/", (req, res) => {
   res.send("Backend работает 🚀");
 });
@@ -323,18 +377,35 @@ app.get("/health", (req, res) => {
   res.json({ ok: true, port: PORT });
 });
 
-app.get("/api/user/:id", (req, res) => {
-  const user = getUser(req.params.id);
-  res.json({
-    ok: true,
-    id: user.id,
-    credits: user.credits,
-    history: user.history
-  });
+app.get("/api/user/:id", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    await ensureUser(userId);
+
+    const user = await getUser(userId);
+    const history = await getHistory(userId);
+
+    res.json({
+      ok: true,
+      id: user.id,
+      credits: user.credits,
+      history
+    });
+  } catch (error) {
+    console.error("GET USER ERROR:", error);
+    res.status(500).json({ ok: false, error: error.message || "User fetch failed" });
+  }
 });
 
 app.post("/api/generate-image", async (req, res) => {
-  const { prompt, model = "Nano Banana Pro", aspectRatio = "1:1", imageDataUrl, userId = "test_user" } = req.body;
+  const {
+    prompt,
+    model = "Nano Banana Pro",
+    aspectRatio = "1:1",
+    imageDataUrl,
+    userId = "test_user",
+    profile = {}
+  } = req.body;
 
   if (!prompt || !String(prompt).trim()) {
     return res.status(400).json({ ok: false, error: "Prompt is required" });
@@ -344,10 +415,9 @@ app.post("/api/generate-image", async (req, res) => {
     return res.status(500).json({ ok: false, error: "FAL_KEY is missing in Railway Variables" });
   }
 
-  let creditsAfterSpend;
-
   try {
-    creditsAfterSpend = spendCredits(userId, 1);
+    await ensureUser(userId, profile);
+    const creditsAfterSpend = await spendCredits(userId, 1);
 
     const endpoint = imageModelToEndpoint(model, Boolean(imageDataUrl));
 
@@ -355,7 +425,7 @@ app.post("/api/generate-image", async (req, res) => {
       ? {
           prompt: String(prompt).trim(),
           image_urls: [imageDataUrl],
-          aspect_ratio: normalizeAspectRatio(aspectRatio, "auto")
+          aspect_ratio: normalizeAspectRatio(aspectRatio, "1:1")
         }
       : {
           prompt: String(prompt).trim(),
@@ -365,12 +435,13 @@ app.post("/api/generate-image", async (req, res) => {
     const data = await runFal(endpoint, input);
     const imageUrl = extractImageUrl(data);
 
-    addHistory(userId, {
+    await addHistory(userId, {
       type: "image",
       model,
       prompt: String(prompt).trim(),
       cost: 1,
-      resultUrl: imageUrl
+      resultUrl: imageUrl,
+      meta: { aspectRatio }
     });
 
     return res.json({
@@ -381,7 +452,9 @@ app.post("/api/generate-image", async (req, res) => {
       raw: data
     });
   } catch (error) {
-    refundCredits(userId, 1);
+    try {
+      await refundCredits(userId, 1);
+    } catch {}
     console.error("IMAGE ERROR:", error);
     return res.status(500).json({
       ok: false,
@@ -398,7 +471,8 @@ app.post("/api/generate-video", async (req, res) => {
     aspect_ratio = "16:9",
     startImageDataUrl,
     endImageDataUrl,
-    userId = "test_user"
+    userId = "test_user",
+    profile = {}
   } = req.body;
 
   if (!prompt || !String(prompt).trim()) {
@@ -409,10 +483,9 @@ app.post("/api/generate-video", async (req, res) => {
     return res.status(500).json({ ok: false, error: "FAL_KEY is missing in Railway Variables" });
   }
 
-  let creditsAfterSpend;
-
   try {
-    creditsAfterSpend = spendCredits(userId, 8);
+    await ensureUser(userId, profile);
+    const creditsAfterSpend = await spendCredits(userId, 8);
 
     const { endpoint, input } = buildVideoRequest({
       model,
@@ -427,12 +500,13 @@ app.post("/api/generate-video", async (req, res) => {
     const data = await runFal(endpoint, input);
     const videoUrl = extractVideoUrl(data);
 
-    addHistory(userId, {
+    await addHistory(userId, {
       type: "video",
       model,
       prompt: String(prompt).trim(),
       cost: 8,
-      resultUrl: videoUrl
+      resultUrl: videoUrl,
+      meta: { duration, aspect_ratio }
     });
 
     return res.json({
@@ -443,7 +517,9 @@ app.post("/api/generate-video", async (req, res) => {
       raw: data
     });
   } catch (error) {
-    refundCredits(userId, 8);
+    try {
+      await refundCredits(userId, 8);
+    } catch {}
     console.error("VIDEO ERROR:", error);
     return res.status(500).json({
       ok: false,
