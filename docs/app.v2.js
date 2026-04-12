@@ -28,6 +28,7 @@ const state = {
   enhanceMode: "Фото upscale",
   enhanceScale: "2x",
   enhanceOutput: "PNG / MP4",
+  enhanceSize: "Original",
 
   imageHistory: [],
   videoHistory: [],
@@ -67,13 +68,20 @@ const durations = ["5 sec", "8 sec", "10 sec", "12 sec"];
 
 const enhanceModes = [
   "Фото upscale",
-  "Видео upscale",
-  "Remove noise",
-  "Restore details"
+  "Видео upscale (soon)",
+  "Remove noise (soon)",
+  "Restore details (soon)"
 ];
 
 const enhanceScales = ["1.5x", "2x", "4x"];
-const enhanceOutputs = ["PNG / MP4", "PNG", "JPG", "WEBP", "MP4"];
+const enhanceOutputs = ["PNG", "JPG", "WEBP"];
+const enhanceSizes = [
+  "Original",
+  "512x512",
+  "1024x1024",
+  "1536x1536",
+  "2048x2048"
+];
 
 function qs(selector) {
   return document.querySelector(selector);
@@ -548,6 +556,10 @@ function renderEnhancePickerOptions(type) {
     title.textContent = "Выбор формата выхода";
     options = enhanceOutputs;
     selected = state.enhanceOutput;
+  } else if (type === "enhanceSize") {
+    title.textContent = "Выбор размера";
+    options = enhanceSizes;
+    selected = state.enhanceSize;
   }
 
   list.innerHTML = options.map(
@@ -565,6 +577,12 @@ function renderEnhancePickerOptions(type) {
       const pickerType = btn.dataset.enhancePicker;
 
       if (pickerType === "enhanceMode") {
+        if (value.includes("(soon)")) {
+          showToast("🚧 Soon...");
+          closeModal("modelModal");
+          return;
+        }
+
         state.enhanceMode = value;
         if (qs("#enhanceModeLabel")) qs("#enhanceModeLabel").textContent = value;
       }
@@ -577,6 +595,11 @@ function renderEnhancePickerOptions(type) {
       if (pickerType === "enhanceOutput") {
         state.enhanceOutput = value;
         if (qs("#enhanceOutputLabel")) qs("#enhanceOutputLabel").textContent = value;
+      }
+
+      if (pickerType === "enhanceSize") {
+        state.enhanceSize = value;
+        if (qs("#enhanceSizeLabel")) qs("#enhanceSizeLabel").textContent = value;
       }
 
       closeModal("modelModal");
@@ -622,6 +645,11 @@ function bindModals() {
 
   qs("#enhanceOutputBtn")?.addEventListener("click", () => {
     renderEnhancePickerOptions("enhanceOutput");
+    openModal("modelModal");
+  });
+
+  qs("#enhanceSizeBtn")?.addEventListener("click", () => {
+    renderEnhancePickerOptions("enhanceSize");
     openModal("modelModal");
   });
 
@@ -714,6 +742,7 @@ async function enhanceFileReal({
   mode,
   scale,
   output,
+  size,
   fileDataUrl,
   mimeType
 }) {
@@ -728,6 +757,7 @@ async function enhanceFileReal({
       mode,
       scale,
       output,
+      size,
       fileDataUrl,
       mimeType,
       userId,
@@ -886,6 +916,11 @@ function bindGenerators() {
     const prompt = qs("#enhancePrompt")?.value?.trim() || "enhance file";
     const file = qs("#enhanceUpload")?.files?.[0] || null;
 
+    if (state.enhanceMode !== "Фото upscale") {
+      showToast("🚧 Soon...");
+      return;
+    }
+
     if (!file) {
       showToast("Сначала загрузи файл");
       return;
@@ -899,7 +934,6 @@ function bindGenerators() {
     try {
       const fileDataUrl = await fileToDataURL(file);
       const mimeType = file.type || "";
-      const isVideo = mimeType.startsWith("video/");
 
       let data = null;
       let isFallback = false;
@@ -910,6 +944,7 @@ function bindGenerators() {
           mode: state.enhanceMode,
           scale: state.enhanceScale,
           output: state.enhanceOutput,
+          size: state.enhanceSize,
           fileDataUrl,
           mimeType
         });
@@ -918,15 +953,17 @@ function bindGenerators() {
         isFallback = true;
       }
 
-      const resultUrl = extractEnhanceUrl(data) || fileDataUrl;
-      if (!extractEnhanceUrl(data)) {
+      const extractedUrl = extractEnhanceUrl(data);
+      const resultUrl = extractedUrl || fileDataUrl;
+
+      if (!extractedUrl) {
         isFallback = true;
       }
 
       renderEnhanceResult({
         originalUrl: fileDataUrl,
         resultUrl,
-        fileType: isVideo ? "video" : "image",
+        fileType: "image",
         isFallback
       });
 
@@ -936,7 +973,7 @@ function bindGenerators() {
 
       state.enhanceHistory.unshift({
         title: `${prompt}`.slice(0, 28),
-        sub: `${state.enhanceMode} • ${state.enhanceScale}`
+        sub: `${state.enhanceMode} • ${state.enhanceScale} • ${state.enhanceSize}`
       });
       state.enhanceHistory = state.enhanceHistory.slice(0, 9);
       renderHistory();
@@ -944,7 +981,7 @@ function bindGenerators() {
       if (isFallback) {
         showToast("Сервер не вернул отдельный enhance-файл");
       } else {
-        showToast("Enhance готов");
+        showToast("Фото улучшено 🔥");
       }
     } catch (error) {
       console.error(error);
@@ -1056,6 +1093,7 @@ function init() {
   if (qs("#enhanceModeLabel")) qs("#enhanceModeLabel").textContent = state.enhanceMode;
   if (qs("#enhanceScaleLabel")) qs("#enhanceScaleLabel").textContent = state.enhanceScale;
   if (qs("#enhanceOutputLabel")) qs("#enhanceOutputLabel").textContent = state.enhanceOutput;
+  if (qs("#enhanceSizeLabel")) qs("#enhanceSizeLabel").textContent = state.enhanceSize;
 
   renderHistory();
   showScreen("home");
