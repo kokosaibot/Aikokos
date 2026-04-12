@@ -440,7 +440,12 @@ app.get("/api/user/:id", async (req, res) => {
 
 app.post("/api/enhance", async (req, res) => {
   try {
-    const { fileDataUrl, mimeType } = req.body || {};
+    const {
+      fileDataUrl,
+      mimeType,
+      userId = "test_user",
+      profile = {}
+    } = req.body || {};
 
     if (!fileDataUrl) {
       return res.status(400).json({
@@ -456,6 +461,16 @@ app.post("/api/enhance", async (req, res) => {
       });
     }
 
+    if (!process.env.FAL_KEY) {
+      return res.status(500).json({
+        ok: false,
+        error: "FAL_KEY is missing in Railway Variables"
+      });
+    }
+
+    await ensureUser(userId, profile);
+    const enhanceCreditsAfterSpend = await spendEnhanceCredits(userId, 1);
+
     const HIDDEN_PROMPT = [
       "Enhance this photo into a higher-quality realistic version.",
       "Preserve the same subject, same composition, same angle, same identity, same clothing, same scene.",
@@ -465,12 +480,14 @@ app.post("/api/enhance", async (req, res) => {
       "No extra objects, no stylization, no text, no watermark."
     ].join(" ");
 
-    const imageUrl = await fal.storage.upload(fileDataUrl);
+    // data URL -> Blob -> fal CDN
+    const imageBlob = dataUrlToBlob(fileDataUrl);
+    const uploadedUrl = await fal.storage.upload(imageBlob);
 
     const result = await fal.subscribe("fal-ai/nano-banana-2/edit", {
       input: {
         prompt: HIDDEN_PROMPT,
-        image_urls: [imageUrl],
+        image_urls: [uploadedUrl],
         output_format: "png",
         aspect_ratio: "1:1"
       },
@@ -485,6 +502,8 @@ app.post("/api/enhance", async (req, res) => {
       null;
 
     if (!resultUrl) {
+      await refundEnhanceCredits(userId, 1);
+
       return res.status(500).json({
         ok: false,
         error: "Nano Banana 2 returned no image URL",
@@ -492,11 +511,29 @@ app.post("/api/enhance", async (req, res) => {
       });
     }
 
+    await addHistory(userId, {
+      type: "enhance",
+      model: "Nano Banana 2 Edit",
+      prompt: "internal enhance prompt",
+      cost: 1,
+      resultUrl,
+      meta: {
+        mode: "Фото upscale",
+        hiddenPrompt: true
+      }
+    });
+
     return res.json({
       ok: true,
-      result_url: resultUrl
+      result_url: resultUrl,
+      enhance_credits: enhanceCreditsAfterSpend
     });
   } catch (error) {
+    try {
+      const { userId = "test_user" } = req.body || {};
+      await refundEnhanceCredits(userId, 1);
+    } catch {}
+
     console.error("Enhance error:", error);
     return res.status(500).json({
       ok: false,
@@ -504,7 +541,6 @@ app.post("/api/enhance", async (req, res) => {
     });
   }
 });
-
 app.post("/api/generate-image", async (req, res) => {
   const {
     prompt,
