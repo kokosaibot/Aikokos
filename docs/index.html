@@ -68,7 +68,7 @@
             <div class="create-icon">⚡</div>
             <div>
               <h3>Enhance</h3>
-              <p>Улучшение качества / AI upscale</p>
+              <p>Улучшение качества фото</p>
             </div>
           </button>
 
@@ -297,69 +297,26 @@
         <div class="page-top">
           <div>
             <div class="section-kicker">Enhance</div>
-            <h2 class="page-title">Улучшение качества</h2>
+            <h2 class="page-title">Улучшение качества фото</h2>
           </div>
           <button class="library-btn" id="openHistoryEnhance">Библиотека</button>
         </div>
 
         <div class="form-card">
           <div class="field">
-            <label>Режим</label>
-            <button class="selector-btn" id="enhanceModeBtn">
-              <span id="enhanceModeLabel">Фото upscale</span>
-              <span>⌄</span>
-            </button>
-          </div>
-
-          <div class="field">
-            <label>Загрузить файл</label>
+            <label>Загрузить фото</label>
             <label class="upload-drop interactive">
-              <input type="file" id="enhanceUpload" accept="image/*,video/*" />
-              <span>Нажми или перетащи файл</span>
+              <input type="file" id="enhanceUpload" accept="image/*" />
+              <span>Нажми или перетащи фото</span>
             </label>
             <div class="file-meta" id="enhanceUploadMeta">Файл не выбран</div>
-          </div>
-
-          <div class="field">
-            <label>Prompt / инструкция</label>
-            <textarea
-              id="enhancePrompt"
-              class="text-area"
-              placeholder="Например: improve sharpness, restore details, remove noise, keep natural texture..."
-            ></textarea>
-          </div>
-
-          <div class="field two-col">
-            <div>
-              <label>Масштаб</label>
-              <button class="selector-btn" id="enhanceScaleBtn">
-                <span id="enhanceScaleLabel">2x</span>
-                <span>⌄</span>
-              </button>
-            </div>
-
-            <div>
-              <label>Размер</label>
-              <button class="selector-btn" id="enhanceSizeBtn">
-                <span id="enhanceSizeLabel">Original</span>
-                <span>⌄</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="field">
-            <label>Выход</label>
-            <button class="selector-btn" id="enhanceOutputBtn">
-              <span id="enhanceOutputLabel">PNG</span>
-              <span>⌄</span>
-            </button>
           </div>
         </div>
 
         <div class="sticky-generate">
           <div class="generate-meta">
-            <span>1 результат</span>
-            <span>стоимость: 2 credits</span>
+            <span>1 улучшение</span>
+            <span>стоимость: 1 enhance credit</span>
           </div>
           <button class="gold-btn strong-btn" id="generateEnhanceBtn">Enhance</button>
         </div>
@@ -501,7 +458,7 @@
           <ul>
             <li>изображения</li>
             <li>видео</li>
-            <li>история</li>
+            <li>enhance</li>
           </ul>
           <button class="gold-btn w-full">Выбрать</button>
         </div>
@@ -537,6 +494,6 @@
     </div>
   </div>
 
-  <script src="./app.v2.js?v=6"></script>
+  <script src="./app.v2.js?v=7"></script>
 </body>
 </html>
