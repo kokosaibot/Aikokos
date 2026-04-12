@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>MONTIX</title>
+  <meta name="theme-color" content="#0a0c12" />
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div class="bg-blur blur-a"></div>
+  <div class="bg-blur blur-b"></div>
+
+  <div class="app-shell">
+    <header class="topbar glass">
+      <div class="brand-wrap">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17.5V6.5c0-.8.9-1.3 1.6-.9l4.8 2.8 4.8-2.8c.7-.4 1.6.1 1.6.9v11c0 .8-.9 1.3-1.6.9l-4.8-2.8-4.8 2.8c-.7.4-1.6-.1-1.6-.9Z"/></svg>
+        </div>
+        <div>
+          <div class="brand-name">MONTIX</div>
+          <div class="brand-sub">AI studio mini app</div>
+        </div>
+      </div>
+
+      <nav class="topnav glass">
+        <button class="topnav-link active" data-screen="home">Home</button>
+        <button class="topnav-link" data-screen="image">Image</button>
+        <button class="topnav-link" data-screen="video">Video</button>
+        <button class="topnav-link" data-screen="enhance">Enhance</button>
+        <button class="topnav-link" data-screen="profile">Profile</button>
+      </nav>
+
+      <div class="topbar-right">
+        <button class="credits-pill" id="openPricingBtn">Credits: --</button>
+        <button class="avatar-mini" id="openProfileBtn">M</button>
+      </div>
+    </header>
+
+    <main class="main-area">
+      <section class="screen active" id="screen-home">
+        <div class="hero-card glass">
+          <div class="hero-copy">
+            <div class="chip">Release build</div>
+            <h1>Создавай image, video и enhance в одном месте</h1>
+            <p>Премиальный mini app с динамическими настройками под модель, прогрессом загрузки, прогрессом генерации и нормальным скачиванием на ПК и телефоне.</p>
+            <div class="hero-actions">
+              <button class="primary-btn" data-go="image">Create image</button>
+              <button class="secondary-btn" data-go="video">Create video</button>
+            </div>
+          </div>
+          <div class="hero-visual">
+            <div class="orb"></div>
+            <div class="floating-card glass">
+              <span>Premium SaaS UI</span>
+              <strong>Kling / Veo / Nano Banana</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="quick-grid">
+          <button class="quick-card glass" data-go="image">
+            <div class="quick-icon">
+              <svg viewBox="0 0 24 24"><path d="M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm1.5 10.5 2.7-3.2 2.3 2.7 2.2-2.7 2.8 3.2"/><circle cx="9" cy="9" r="1.5"/></svg>
+            </div>
+            <div><h3>Image</h3><p>Text + reference image + size + quality</p></div>
+          </button>
+
+          <button class="quick-card glass" data-go="video">
+            <div class="quick-icon">
+              <svg viewBox="0 0 24 24"><path d="M5 6.5A1.5 1.5 0 0 1 7.3 5.2l10 6.1a1.5 1.5 0 0 1 0 2.6l-10 6.1A1.5 1.5 0 0 1 5 18.7V6.5Z"/></svg>
+            </div>
+            <div><h3>Video</h3><p>Dynamic model UI + sound toggle + motion control</p></div>
+          </button>
+
+          <button class="quick-card glass" data-go="enhance">
+            <div class="quick-icon">
+              <svg viewBox="0 0 24 24"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Zm7 12 1 2.8 2.8 1-2.8 1-1 2.8-1-2.8-2.8-1 2.8-1 1-2.8Z"/></svg>
+            </div>
+            <div><h3>Enhance</h3><p>Upscale and clean quality boost</p></div>
+          </button>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-image">
+        <div class="page-top">
+          <div>
+            <div class="section-kicker">IMAGE</div>
+            <h2 class="page-title">Создание изображений</h2>
+          </div>
+          <button class="pill-btn" id="openHistoryImage">Library</button>
+        </div>
+
+        <div class="editor-card glass">
+          <div class="grid-two">
+            <div class="field">
+              <label>Model</label>
+              <button class="selector-btn" id="imageModelBtn"><span id="imageModelLabel">Nano Banana Pro</span><span>⌄</span></button>
+            </div>
+            <div class="field">
+              <label>Quality</label>
+              <button class="selector-btn" id="imageQualityBtn"><span id="imageQualityLabel">Standard</span><span>⌄</span></button>
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <div class="field">
+              <label>Size / ratio</label>
+              <button class="selector-btn" id="ratioBtnImage"><span id="ratioImageLabel">1:1</span><span>⌄</span></button>
+            </div>
+            <div class="field">
+              <label>Reference image</label>
+              <label class="upload-drop" for="imageUpload">
+                <input type="file" id="imageUpload" accept="image/*" />
+                <span>Нажми чтобы загрузить</span>
+              </label>
+              <div class="file-meta" id="imageUploadMeta">Файл не выбран</div>
+              <div class="progress-wrap hidden" id="imageUploadProgressWrap">
+                <div class="progress-track"><div class="progress-fill" id="imageUploadProgressBar"></div></div>
+                <div class="progress-meta"><span>Upload</span><span id="imageUploadProgressText">0%</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Prompt</label>
+            <textarea id="imagePrompt" class="text-area" placeholder="Опиши, что нужно сгенерировать..."></textarea>
+          </div>
+        </div>
+
+        <div class="action-card glass">
+          <div>
+            <div class="action-title">Image generation</div>
+            <div class="action-sub" id="imageCostLabel">Стоимость: 2 credits</div>
+          </div>
+          <button class="primary-btn action-btn" id="generateImageBtn">Generate image</button>
+        </div>
+
+        <div class="progress-panel glass hidden" id="imageGenerationPanel">
+          <div class="panel-head"><strong>Generation progress</strong><span id="imageGenerationPercent">0%</span></div>
+          <div class="progress-track large"><div class="progress-fill" id="imageGenerationBar"></div></div>
+          <div class="status-text" id="imageGenerationStatus">Ожидание</div>
+        </div>
+
+        <div class="result-card glass">
+          <div class="panel-head"><strong>Result</strong><span>Image output</span></div>
+          <div id="imageResultContent" class="empty-state">Пока пусто</div>
+        </div>
+
+        <div class="result-card glass">
+          <div class="panel-head"><strong>History</strong><span>Последние изображения</span></div>
+          <div class="history-grid" id="imageHistoryGrid"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-video">
+        <div class="page-top">
+          <div>
+            <div class="section-kicker">VIDEO</div>
+            <h2 class="page-title">Создание видео</h2>
+          </div>
+          <button class="pill-btn" id="openHistoryVideo">Library</button>
+        </div>
+
+        <div class="editor-card glass">
+          <div class="grid-two">
+            <div class="field">
+              <label>Model</label>
+              <button class="selector-btn" id="videoModelBtn"><span id="videoModelLabel">Kling 3.0</span><span>⌄</span></button>
+            </div>
+            <div class="field">
+              <label>Quality</label>
+              <button class="selector-btn" id="videoQualityBtn"><span id="videoQualityLabel">Balanced</span><span>⌄</span></button>
+            </div>
+          </div>
+
+          <div id="videoModelFields"></div>
+
+          <div class="field">
+            <label>Prompt</label>
+            <textarea id="videoPrompt" class="text-area" placeholder="Опиши сцену, стиль, движение камеры, атмосферу..."></textarea>
+          </div>
+
+          <div class="grid-two">
+            <div class="field">
+              <label>Aspect ratio</label>
+              <button class="selector-btn" id="ratioBtnVideo"><span id="ratioVideoLabel">16:9</span><span>⌄</span></button>
+            </div>
+            <div class="field">
+              <label>Duration</label>
+              <button class="selector-btn" id="durationBtn"><span id="durationLabel">5 sec</span><span>⌄</span></button>
+            </div>
+          </div>
+
+          <div class="grid-two">
+            <div class="field">
+              <label>Resolution</label>
+              <button class="selector-btn" id="videoResolutionBtn"><span id="videoResolutionLabel">1080p</span><span>⌄</span></button>
+            </div>
+            <div class="field">
+              <label>Sound</label>
+              <div class="segmented" id="soundToggle">
+                <button class="seg-btn active" data-sound="on">With sound</button>
+                <button class="seg-btn" data-sound="off">No sound</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-card glass">
+          <div>
+            <div class="action-title">Video generation</div>
+            <div class="action-sub" id="videoCostLabel">Стоимость: 10 credits</div>
+          </div>
+          <button class="primary-btn action-btn" id="generateVideoBtn">Generate video</button>
+        </div>
+
+        <div class="progress-panel glass hidden" id="videoGenerationPanel">
+          <div class="panel-head"><strong>Generation progress</strong><span id="videoGenerationPercent">0%</span></div>
+          <div class="progress-track large"><div class="progress-fill" id="videoGenerationBar"></div></div>
+          <div class="status-text" id="videoGenerationStatus">Ожидание</div>
+        </div>
+
+        <div class="result-card glass">
+          <div class="panel-head"><strong>Result</strong><span>Video output</span></div>
+          <div id="videoResultContent" class="empty-state">Пока пусто</div>
+        </div>
+
+        <div class="result-card glass">
+          <div class="panel-head"><strong>History</strong><span>Последние видео</span></div>
+          <div class="history-grid" id="videoHistoryGrid"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-enhance">
+        <div class="page-top">
+          <div>
+            <div class="section-kicker">ENHANCE</div>
+            <h2 class="page-title">Улучшение качества</h2>
+          </div>
+          <button class="pill-btn" id="openHistoryEnhance">Library</button>
+        </div>
+
+        <div class="editor-card glass">
+          <div class="grid-two">
+            <div class="field">
+              <label>Enhance quality</label>
+              <button class="selector-btn" id="enhanceQualityBtn"><span id="enhanceQualityLabel">Quality</span><span>⌄</span></button>
+            </div>
+            <div class="field">
+              <label>Output resolution</label>
+              <button class="selector-btn" id="enhanceResolutionBtn"><span id="enhanceResolutionLabel">4k</span><span>⌄</span></button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Upload photo</label>
+            <label class="upload-drop" for="enhanceUpload">
+              <input type="file" id="enhanceUpload" accept="image/*" />
+              <span>Нажми чтобы загрузить фото</span>
+            </label>
+            <div class="file-meta" id="enhanceUploadMeta">Файл не выбран</div>
+            <div class="progress-wrap hidden" id="enhanceUploadProgressWrap">
+              <div class="progress-track"><div class="progress-fill" id="enhanceUploadProgressBar"></div></div>
+              <div class="progress-meta"><span>Upload</span><span id="enhanceUploadProgressText">0%</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-card glass">
+          <div>
+            <div class="action-title">Enhance</div>
+            <div class="action-sub" id="enhanceCostLabel">Стоимость: 2 enhance credits</div>
+          </div>
+          <button class="primary-btn action-btn" id="generateEnhanceBtn">Enhance photo</button>
+        </div>
+
+        <div class="progress-panel glass hidden" id="enhanceGenerationPanel">
+          <div class="panel-head"><strong>Enhance progress</strong><span id="enhanceGenerationPercent">0%</span></div>
+          <div class="progress-track large"><div class="progress-fill" id="enhanceGenerationBar"></div></div>
+          <div class="status-text" id="enhanceGenerationStatus">Ожидание</div>
+        </div>
+
+        <div class="result-card glass">
+          <div class="panel-head"><strong>Result</strong><span>Enhanced output</span></div>
+          <div id="enhanceResultContent" class="empty-state">Пока пусто</div>
+        </div>
+
+        <div class="result-card glass">
+          <div class="panel-head"><strong>History</strong><span>Последние enhance</span></div>
+          <div class="history-grid" id="enhanceHistoryGrid"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-profile">
+        <div class="profile-wrap glass">
+          <div class="profile-badge">M</div>
+          <div>
+            <h2 class="page-title small">MONTIX profile</h2>
+            <p class="muted">Текущий мини-апп уже готов под следующий этап — подключение оплаты.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop hidden" id="selectionModal">
+    <div class="modal-card glass">
+      <div class="modal-head">
+        <h3 id="selectionModalTitle">Выбор</h3>
+        <button class="close-btn" data-close="selectionModal">✕</button>
+      </div>
+      <div class="modal-list" id="selectionModalList"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="pricingModal">
+    <div class="modal-card glass large-modal">
+      <div class="modal-head">
+        <h3>Plans</h3>
+        <button class="close-btn" data-close="pricingModal">✕</button>
+      </div>
+      <div class="pricing-grid">
+        <div class="price-card glass">
+          <h4>Starter</h4>
+          <div class="price-num">$35</div>
+          <p>Быстрый старт для тестов.</p>
+        </div>
+        <div class="price-card glass featured">
+          <h4>Pro</h4>
+          <div class="price-num">$75</div>
+          <p>Основной рабочий тариф.</p>
+        </div>
+        <div class="price-card glass">
+          <h4>Scale</h4>
+          <div class="price-num">$120</div>
+          <p>Для активного использования.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.v2.js?v=release-1"></script>
+</body>
+</html>
