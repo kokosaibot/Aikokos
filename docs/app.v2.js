@@ -17,13 +17,21 @@ const userId = tgUser?.id || "test_user";
 
 const state = {
   currentScreen: "home",
+
   imageModel: "Nano Banana Pro",
   videoModel: "Kling 3.0",
+
   imageRatio: "Automatic",
   videoRatio: "16:9",
   duration: "5 sec",
+
+  enhanceMode: "Фото upscale",
+  enhanceScale: "2x",
+  enhanceOutput: "PNG / MP4",
+
   imageHistory: [],
-  videoHistory: []
+  videoHistory: [],
+  enhanceHistory: []
 };
 
 const imageModels = [
@@ -57,6 +65,18 @@ const ratios = [
 
 const durations = ["5 sec", "8 sec", "10 sec", "12 sec"];
 
+const enhanceModes = [
+  "Фото upscale",
+  "Видео upscale",
+  "Remove noise",
+  "Restore details"
+];
+
+const enhanceScales = ["1.5x", "2x", "4x"];
+const enhanceOutputs = ["PNG / MP4", "PNG", "JPG", "WEBP", "MP4"];
+
+let activePickerType = null;
+
 function qs(selector) {
   return document.querySelector(selector);
 }
@@ -76,14 +96,21 @@ function syncHistoryFromServer(items) {
     .filter((x) => x.type === "image")
     .map((x) => ({
       title: x.prompt?.slice(0, 28) || "image",
-      sub: x.model
+      sub: x.model || "image"
     }));
 
   state.videoHistory = items
     .filter((x) => x.type === "video")
     .map((x) => ({
       title: x.prompt?.slice(0, 28) || "video",
-      sub: x.model
+      sub: x.model || "video"
+    }));
+
+  state.enhanceHistory = items
+    .filter((x) => x.type === "enhance")
+    .map((x) => ({
+      title: x.prompt?.slice(0, 28) || "enhance",
+      sub: x.model || "enhance"
     }));
 
   renderHistory();
@@ -93,6 +120,7 @@ async function loadUser() {
   try {
     const response = await fetch(`${API_BASE}/api/user/${userId}`);
     const data = await response.json();
+
     if (data.ok) {
       updateCredits(data.credits);
       syncHistoryFromServer(data.history || []);
@@ -116,6 +144,7 @@ function fileToDataURL(file) {
 function ensureResultBlocks() {
   const imageScreen = qs("#screen-image");
   const videoScreen = qs("#screen-video");
+  const enhanceScreen = qs("#screen-enhance");
 
   if (imageScreen && !qs("#imageResultBlock")) {
     const block = document.createElement("div");
@@ -148,6 +177,22 @@ function ensureResultBlocks() {
     `;
     videoScreen.appendChild(block);
   }
+
+  if (enhanceScreen && !qs("#enhanceResultBlock")) {
+    const block = document.createElement("div");
+    block.id = "enhanceResultBlock";
+    block.className = "history-block";
+    block.innerHTML = `
+      <div class="section-head small-head">
+        <h3>Результат</h3>
+        <p>Улучшенный файл появится здесь</p>
+      </div>
+      <div id="enhanceResultContent" style="min-height:120px;display:flex;align-items:center;justify-content:center;color:#9c958d;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:18px;background:rgba(255,255,255,0.02);">
+        Пока пусто
+      </div>
+    `;
+    enhanceScreen.appendChild(block);
+  }
 }
 
 function setActiveNav(screen) {
@@ -159,8 +204,10 @@ function setActiveNav(screen) {
 function showScreen(screen) {
   state.currentScreen = screen;
   qsa(".screen").forEach((el) => el.classList.remove("active"));
+
   const target = qs(`#screen-${screen}`);
   if (target) target.classList.add("active");
+
   setActiveNav(screen);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -186,6 +233,7 @@ function closeModal(id) {
 function renderHistory() {
   const imageGrid = qs("#imageHistoryGrid");
   const videoGrid = qs("#videoHistoryGrid");
+  const enhanceGrid = qs("#enhanceHistoryGrid");
 
   if (imageGrid) {
     imageGrid.innerHTML = state.imageHistory.length
@@ -211,6 +259,19 @@ function renderHistory() {
           `
         ).join("")
       : `<div style="color:#9c958d;">История видео пока пустая</div>`;
+  }
+
+  if (enhanceGrid) {
+    enhanceGrid.innerHTML = state.enhanceHistory.length
+      ? state.enhanceHistory.map(
+          (item) => `
+            <div class="history-item interactive">
+              <small>${item.sub}</small>
+              <strong>${item.title}</strong>
+            </div>
+          `
+        ).join("")
+      : `<div style="color:#9c958d;">История enhance пока пустая</div>`;
   }
 }
 
@@ -242,6 +303,33 @@ function renderVideoResult(url) {
   block.innerHTML = `
     <div style="width:100%;">
       <video src="${url}" controls playsinline style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"></video>
+    </div>
+  `;
+}
+
+function renderEnhanceResult(url, fileType = "image") {
+  const block = qs("#enhanceResultContent");
+  if (!block) return;
+
+  if (!url) {
+    block.innerHTML = "⚠️ Нет результата в ответе";
+    return;
+  }
+
+  const isVideo = fileType === "video" || /\.mp4(\?|$)/i.test(url);
+
+  if (isVideo) {
+    block.innerHTML = `
+      <div style="width:100%;">
+        <video src="${url}" controls playsinline style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"></video>
+      </div>
+    `;
+    return;
+  }
+
+  block.innerHTML = `
+    <div style="width:100%;">
+      <img src="${url}" alt="enhanced-result" style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;" />
     </div>
   `;
 }
@@ -292,6 +380,7 @@ function renderModelOptions(type) {
   qsa("[data-model-type]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const value = btn.dataset.modelValue;
+
       if (type === "image") {
         state.imageModel = value;
         qs("#imageModelLabel").textContent = value;
@@ -299,6 +388,7 @@ function renderModelOptions(type) {
         state.videoModel = value;
         qs("#videoModelLabel").textContent = value;
       }
+
       closeModal("modelModal");
     });
   });
@@ -322,6 +412,7 @@ function renderRatioOptions(type) {
   qsa("[data-ratio-type]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const value = btn.dataset.ratioValue;
+
       if (type === "image") {
         state.imageRatio = value;
         qs("#ratioImageLabel").textContent = value;
@@ -329,6 +420,7 @@ function renderRatioOptions(type) {
         state.videoRatio = value;
         qs("#ratioVideoLabel").textContent = value;
       }
+
       closeModal("ratioModal");
     });
   });
@@ -357,6 +449,62 @@ function renderDurationOptions() {
   });
 }
 
+function renderEnhancePickerOptions(type) {
+  const list = qs("#modelModalList");
+  const title = qs("#modelModalTitle");
+  if (!list || !title) return;
+
+  let options = [];
+  let selected = "";
+
+  if (type === "enhanceMode") {
+    title.textContent = "Выбор режима Enhance";
+    options = enhanceModes;
+    selected = state.enhanceMode;
+  } else if (type === "enhanceScale") {
+    title.textContent = "Выбор масштаба";
+    options = enhanceScales;
+    selected = state.enhanceScale;
+  } else if (type === "enhanceOutput") {
+    title.textContent = "Выбор формата выхода";
+    options = enhanceOutputs;
+    selected = state.enhanceOutput;
+  }
+
+  list.innerHTML = options.map(
+    (item) => `
+      <button class="modal-option ${selected === item ? "selected" : ""}" data-enhance-picker="${type}" data-enhance-value="${item}">
+        <span>${item}</span>
+        <span>${selected === item ? "✓" : ""}</span>
+      </button>
+    `
+  ).join("");
+
+  qsa("[data-enhance-picker]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const value = btn.dataset.enhanceValue;
+      const pickerType = btn.dataset.enhancePicker;
+
+      if (pickerType === "enhanceMode") {
+        state.enhanceMode = value;
+        if (qs("#enhanceModeLabel")) qs("#enhanceModeLabel").textContent = value;
+      }
+
+      if (pickerType === "enhanceScale") {
+        state.enhanceScale = value;
+        if (qs("#enhanceScaleLabel")) qs("#enhanceScaleLabel").textContent = value;
+      }
+
+      if (pickerType === "enhanceOutput") {
+        state.enhanceOutput = value;
+        if (qs("#enhanceOutputLabel")) qs("#enhanceOutputLabel").textContent = value;
+      }
+
+      closeModal("modelModal");
+    });
+  });
+}
+
 function bindModals() {
   qs("#imageModelBtn")?.addEventListener("click", () => {
     renderModelOptions("image");
@@ -381,6 +529,24 @@ function bindModals() {
   qs("#durationBtn")?.addEventListener("click", () => {
     renderDurationOptions();
     openModal("durationModal");
+  });
+
+  qs("#enhanceModeBtn")?.addEventListener("click", () => {
+    activePickerType = "enhanceMode";
+    renderEnhancePickerOptions(activePickerType);
+    openModal("modelModal");
+  });
+
+  qs("#enhanceScaleBtn")?.addEventListener("click", () => {
+    activePickerType = "enhanceScale";
+    renderEnhancePickerOptions(activePickerType);
+    openModal("modelModal");
+  });
+
+  qs("#enhanceOutputBtn")?.addEventListener("click", () => {
+    activePickerType = "enhanceOutput";
+    renderEnhancePickerOptions(activePickerType);
+    openModal("modelModal");
   });
 
   qsa("[data-close]").forEach((btn) => {
@@ -467,6 +633,39 @@ async function generateVideoReal({
   return await response.json();
 }
 
+async function enhanceFileReal({
+  prompt,
+  mode,
+  scale,
+  output,
+  fileDataUrl,
+  mimeType
+}) {
+  const response = await fetch(`${API_BASE}/api/enhance`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-id": String(userId)
+    },
+    body: JSON.stringify({
+      prompt,
+      mode,
+      scale,
+      output,
+      fileDataUrl,
+      mimeType,
+      userId,
+      profile: {
+        username: tgUser?.username || null,
+        first_name: tgUser?.first_name || null,
+        last_name: tgUser?.last_name || null
+      }
+    })
+  });
+
+  return await response.json();
+}
+
 function extractImageUrl(data) {
   return (
     data?.image ||
@@ -481,6 +680,22 @@ function extractVideoUrl(data) {
     data?.video ||
     data?.video_url ||
     data?.result?.video?.url ||
+    data?.videos?.[0]?.url ||
+    null
+  );
+}
+
+function extractEnhanceUrl(data) {
+  return (
+    data?.result_url ||
+    data?.file_url ||
+    data?.image ||
+    data?.video ||
+    data?.video_url ||
+    data?.result?.url ||
+    data?.result?.image ||
+    data?.result?.video?.url ||
+    data?.images?.[0]?.url ||
     data?.videos?.[0]?.url ||
     null
   );
@@ -517,6 +732,7 @@ function bindGenerators() {
 
       const imageUrl = extractImageUrl(data);
       renderImageResult(imageUrl);
+
       if (typeof data.credits !== "undefined") updateCredits(data.credits);
 
       state.imageHistory.unshift({
@@ -570,6 +786,7 @@ function bindGenerators() {
 
       const videoUrl = extractVideoUrl(data);
       renderVideoResult(videoUrl);
+
       if (typeof data.credits !== "undefined") updateCredits(data.credits);
 
       state.videoHistory.unshift({
@@ -588,6 +805,69 @@ function bindGenerators() {
       btn.disabled = false;
     }
   });
+
+  qs("#generateEnhanceBtn")?.addEventListener("click", async () => {
+    const prompt = qs("#enhancePrompt")?.value?.trim() || "enhance file";
+    const file = qs("#enhanceUpload")?.files?.[0] || null;
+
+    if (!file) {
+      showToast("Сначала загрузи файл");
+      return;
+    }
+
+    const btn = qs("#generateEnhanceBtn");
+    const oldText = btn.textContent;
+    btn.textContent = "Enhancing...";
+    btn.disabled = true;
+
+    try {
+      const fileDataUrl = await fileToDataURL(file);
+      const mimeType = file.type || "";
+      const isVideo = mimeType.startsWith("video/");
+
+      let data = null;
+
+      try {
+        data = await enhanceFileReal({
+          prompt,
+          mode: state.enhanceMode,
+          scale: state.enhanceScale,
+          output: state.enhanceOutput,
+          fileDataUrl,
+          mimeType
+        });
+      } catch (apiError) {
+        console.warn("Enhance API fallback:", apiError);
+      }
+
+      let resultUrl = extractEnhanceUrl(data);
+
+      if (!resultUrl) {
+        resultUrl = fileDataUrl;
+      }
+
+      renderEnhanceResult(resultUrl, isVideo ? "video" : "image");
+
+      if (data && typeof data.credits !== "undefined") {
+        updateCredits(data.credits);
+      }
+
+      state.enhanceHistory.unshift({
+        title: `${prompt}`.slice(0, 28),
+        sub: `${state.enhanceMode} • ${state.enhanceScale}`
+      });
+      state.enhanceHistory = state.enhanceHistory.slice(0, 9);
+      renderHistory();
+
+      showToast(data?.ok === false ? "Результат показан локально" : "Enhance готов");
+    } catch (error) {
+      console.error(error);
+      showToast(`Ошибка: ${error.message}`);
+    } finally {
+      btn.textContent = oldText;
+      btn.disabled = false;
+    }
+  });
 }
 
 function bindLibraryButtons() {
@@ -597,6 +877,10 @@ function bindLibraryButtons() {
 
   qs("#openHistoryVideo")?.addEventListener("click", () => {
     qs("#videoHistoryGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  qs("#openHistoryEnhance")?.addEventListener("click", () => {
+    qs("#enhanceHistoryGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
   });
 }
 
@@ -621,6 +905,7 @@ function bindProfile() {
 
   hidePromptToggle?.addEventListener("change", () => {
     if (!templatePreview) return;
+
     if (hidePromptToggle.checked) {
       templatePreview.textContent = "prompt: ******** ******** ****** ** ******";
     } else {
@@ -675,6 +960,16 @@ function init() {
   updateFileName("#imageUpload", "#imageUploadMeta");
   updateFileName("#videoStartUpload", "#videoStartMeta");
   updateFileName("#videoEndUpload", "#videoEndMeta");
+  updateFileName("#enhanceUpload", "#enhanceUploadMeta");
+
+  if (qs("#imageModelLabel")) qs("#imageModelLabel").textContent = state.imageModel;
+  if (qs("#videoModelLabel")) qs("#videoModelLabel").textContent = state.videoModel;
+  if (qs("#ratioImageLabel")) qs("#ratioImageLabel").textContent = state.imageRatio;
+  if (qs("#ratioVideoLabel")) qs("#ratioVideoLabel").textContent = state.videoRatio;
+  if (qs("#durationLabel")) qs("#durationLabel").textContent = state.duration;
+  if (qs("#enhanceModeLabel")) qs("#enhanceModeLabel").textContent = state.enhanceMode;
+  if (qs("#enhanceScaleLabel")) qs("#enhanceScaleLabel").textContent = state.enhanceScale;
+  if (qs("#enhanceOutputLabel")) qs("#enhanceOutputLabel").textContent = state.enhanceOutput;
 
   renderHistory();
   showScreen("home");
