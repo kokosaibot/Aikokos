@@ -23,6 +23,19 @@ app.use(cors({
 app.options("*", cors());
 app.use(express.json({ limit: "30mb" }));
 
+function dataUrlToBlob(dataUrl) {
+  const match = /^data:(.*?);base64,(.*)$/.exec(dataUrl || "");
+  if (!match) {
+    throw new Error("Invalid data URL");
+  }
+
+  const mime = match[1];
+  const base64 = match[2];
+  const buffer = Buffer.from(base64, "base64");
+
+  return new Blob([buffer], { type: mime });
+}
+
 function normalizeAspectRatio(ratio, fallback = "16:9") {
   if (!ratio || ratio === "Automatic" || ratio === "auto") return fallback;
   return ratio;
@@ -186,6 +199,9 @@ async function getHistory(userId) {
 function imageModelToEndpoint(model, hasImage) {
   if (model === "Nano Banana Pro") {
     return hasImage ? "fal-ai/nano-banana-pro/edit" : "fal-ai/nano-banana-pro";
+  }
+  if (model === "Nano Banana 2") {
+    return hasImage ? "fal-ai/nano-banana-2/edit" : "fal-ai/nano-banana-2";
   }
   return hasImage ? "fal-ai/nano-banana/edit" : "fal-ai/nano-banana";
 }
@@ -480,7 +496,6 @@ app.post("/api/enhance", async (req, res) => {
       "No extra objects, no stylization, no text, no watermark."
     ].join(" ");
 
-    // data URL -> Blob -> fal CDN
     const imageBlob = dataUrlToBlob(fileDataUrl);
     const uploadedUrl = await fal.storage.upload(imageBlob);
 
@@ -541,6 +556,7 @@ app.post("/api/enhance", async (req, res) => {
     });
   }
 });
+
 app.post("/api/generate-image", async (req, res) => {
   const {
     prompt,
