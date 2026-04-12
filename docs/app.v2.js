@@ -27,7 +27,7 @@ const state = {
 
   enhanceMode: "Фото upscale",
   enhanceScale: "2x",
-  enhanceOutput: "PNG / MP4",
+  enhanceOutput: "PNG",
   enhanceSize: "Original",
 
   imageHistory: [],
@@ -102,7 +102,7 @@ function escapeHtml(value) {
 
 function updateCredits(value) {
   const btn = qs("#openPricingBtn");
-  if (!btn) return;
+  if (!btn || typeof value === "undefined" || value === null) return;
   btn.textContent = `Credits: ${value}`;
 }
 
@@ -341,7 +341,7 @@ function renderVideoResult(url) {
   `;
 }
 
-function renderEnhanceResult({ originalUrl, resultUrl, fileType = "image", isFallback = false }) {
+function renderEnhanceResult({ originalUrl, resultUrl, isFallback = false }) {
   const block = qs("#enhanceResultContent");
   if (!block) return;
 
@@ -350,26 +350,7 @@ function renderEnhanceResult({ originalUrl, resultUrl, fileType = "image", isFal
     return;
   }
 
-  const isVideo = fileType === "video" || /\.mp4(\?|$)/i.test(resultUrl);
   const sameAsOriginal = originalUrl && resultUrl === originalUrl;
-
-  if (isVideo) {
-    block.innerHTML = `
-      <div style="width:100%;text-align:center;">
-        <div style="margin-bottom:10px;color:#c8c1b8;">
-          ${isFallback || sameAsOriginal ? "Показан исходный файл. Реальный enhance с сервера не пришёл." : "Результат enhance готов."}
-        </div>
-        <video
-          src="${resultUrl}"
-          controls
-          playsinline
-          style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"
-        ></video>
-        ${buildDownloadButton(resultUrl, "enhanced-video.mp4")}
-      </div>
-    `;
-    return;
-  }
 
   if (!sameAsOriginal && originalUrl) {
     block.innerHTML = `
@@ -738,11 +719,6 @@ async function generateVideoReal({
 }
 
 async function enhanceFileReal({
-  prompt,
-  mode,
-  scale,
-  output,
-  size,
   fileDataUrl,
   mimeType
 }) {
@@ -753,11 +729,6 @@ async function enhanceFileReal({
       "x-user-id": String(userId)
     },
     body: JSON.stringify({
-      prompt,
-      mode,
-      scale,
-      output,
-      size,
       fileDataUrl,
       mimeType,
       userId,
@@ -796,13 +767,8 @@ function extractEnhanceUrl(data) {
     data?.result_url ||
     data?.file_url ||
     data?.image ||
-    data?.video ||
-    data?.video_url ||
-    data?.result?.url ||
-    data?.result?.image ||
-    data?.result?.video?.url ||
+    data?.result?.images?.[0]?.url ||
     data?.images?.[0]?.url ||
-    data?.videos?.[0]?.url ||
     null
   );
 }
@@ -913,7 +879,6 @@ function bindGenerators() {
   });
 
   qs("#generateEnhanceBtn")?.addEventListener("click", async () => {
-    const prompt = qs("#enhancePrompt")?.value?.trim() || "enhance file";
     const file = qs("#enhanceUpload")?.files?.[0] || null;
 
     if (state.enhanceMode !== "Фото upscale") {
@@ -935,54 +900,32 @@ function bindGenerators() {
       const fileDataUrl = await fileToDataURL(file);
       const mimeType = file.type || "";
 
-      let data = null;
-      let isFallback = false;
+      const data = await enhanceFileReal({
+        fileDataUrl,
+        mimeType
+      });
 
-      try {
-        data = await enhanceFileReal({
-          prompt,
-          mode: state.enhanceMode,
-          scale: state.enhanceScale,
-          output: state.enhanceOutput,
-          size: state.enhanceSize,
-          fileDataUrl,
-          mimeType
-        });
-      } catch (apiError) {
-        console.warn("Enhance API fallback:", apiError);
-        isFallback = true;
+      if (!data.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error || "Enhance failed"));
       }
 
-      const extractedUrl = extractEnhanceUrl(data);
-      const resultUrl = extractedUrl || fileDataUrl;
-
-      if (!extractedUrl) {
-        isFallback = true;
-      }
+      const resultUrl = extractEnhanceUrl(data);
+      const isFallback = !resultUrl;
 
       renderEnhanceResult({
         originalUrl: fileDataUrl,
-        resultUrl,
-        fileType: "image",
+        resultUrl: resultUrl || fileDataUrl,
         isFallback
       });
 
-      if (data && typeof data.credits !== "undefined") {
-        updateCredits(data.credits);
-      }
-
       state.enhanceHistory.unshift({
-        title: `${prompt}`.slice(0, 28),
-        sub: `${state.enhanceMode} • ${state.enhanceScale} • ${state.enhanceSize}`
+        title: "Photo enhance",
+        sub: "Nano Banana 2 Edit"
       });
       state.enhanceHistory = state.enhanceHistory.slice(0, 9);
       renderHistory();
 
-      if (isFallback) {
-        showToast("Сервер не вернул отдельный enhance-файл");
-      } else {
-        showToast("Фото улучшено 🔥");
-      }
+      showToast(resultUrl ? "Фото улучшено 🔥" : "Сервер не вернул новый файл");
     } catch (error) {
       console.error(error);
       showToast(`Ошибка: ${error.message}`);
