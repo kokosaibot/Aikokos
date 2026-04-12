@@ -1,13 +1,12 @@
-console.log("APP V2 LOADED");
+console.log("MONTIX release loaded");
 
 const tg = window.Telegram?.WebApp;
-
 if (tg) {
   try {
     tg.ready();
     tg.expand();
-  } catch (e) {
-    console.warn("Telegram WebApp init warning:", e);
+  } catch (error) {
+    console.warn("Telegram init warning", error);
   }
 }
 
@@ -15,66 +14,52 @@ const API_BASE = "https://aikokos-production.up.railway.app";
 const tgUser = tg?.initDataUnsafe?.user || null;
 const userId = tgUser?.id || "test_user";
 
-const state = {
-  currentScreen: "home",
-
-  imageModel: "Nano Banana Pro",
-  videoModel: "Kling 3.0",
-
-  imageRatio: "Automatic",
-  videoRatio: "16:9",
-  duration: "5 sec",
-
-  imageQuality: "Standard",
-  videoQuality: "Balanced",
-
-  imageHistory: [],
-  videoHistory: [],
-  enhanceHistory: []
+const imageModels = ["Nano Banana Pro", "Nano Banana 2"];
+const videoModels = ["Kling 3.0", "Kling Motion Control", "Kling Edit", "Seedance 2.0", "Veo 3 Lite", "Veo 3 Fast", "Veo 3 Quality"];
+const imageRatios = ["1:1", "3:4", "4:5", "9:16", "16:9"];
+const videoRatios = ["16:9", "9:16", "1:1"];
+const durations = ["5 sec", "6 sec", "8 sec", "10 sec"];
+const imageQualities = ["Fast", "Standard", "Quality"];
+const videoQualities = ["Fast", "Balanced", "Quality"];
+const enhanceQualities = ["Standard", "Quality"];
+const enhanceResolutions = ["2k", "4k"];
+const videoResolutions = {
+  "Kling 3.0": ["720p", "1080p"],
+  "Kling Motion Control": ["720p", "1080p"],
+  "Kling Edit": ["720p", "1080p"],
+  "Seedance 2.0": ["720p", "1080p"],
+  "Veo 3 Lite": ["720p", "1080p"],
+  "Veo 3 Fast": ["720p", "1080p"],
+  "Veo 3 Quality": ["1080p"]
 };
 
-const imageModels = [
-  "Nano Banana Pro",
-  "Nano Banana 2"
-];
+const state = {
+  currentScreen: "home",
+  imageModel: "Nano Banana Pro",
+  imageRatio: "1:1",
+  imageQuality: "Standard",
+  videoModel: "Kling 3.0",
+  videoRatio: "16:9",
+  videoQuality: "Balanced",
+  videoDuration: "5 sec",
+  videoResolution: "1080p",
+  videoSound: true,
+  enhanceQuality: "Quality",
+  enhanceResolution: "4k",
+  history: { image: [], video: [], enhance: [] },
+  videoSettings: {
+    genericImageFile: null,
+    genericEndImageFile: null,
+    motionImageFile: null,
+    motionVideoFile: null,
+    sceneControlEnabled: true,
+    sceneControlMode: "character",
+    orientation: "image"
+  }
+};
 
-const videoModels = [
-  "Kling 3.0",
-  "Kling Motion Control",
-  "Kling Edit",
-  "Seedance 2.0",
-  "Veo 3 Lite",
-  "Veo 3 Fast",
-  "Veo 3 Quality"
-];
-
-const ratios = [
-  "Automatic",
-  "1:1",
-  "2:3",
-  "3:2",
-  "3:4",
-  "4:3",
-  "4:5",
-  "5:4",
-  "9:16",
-  "16:9",
-  "21:9"
-];
-
-const durations = ["5 sec", "8 sec", "10 sec", "12 sec"];
-
-const imageQualityOptions = ["Fast", "Standard", "Quality"];
-const videoQualityOptions = ["Fast", "Balanced", "Quality"];
-
-function qs(selector) {
-  return document.querySelector(selector);
-}
-
-function qsa(selector) {
-  return Array.from(document.querySelectorAll(selector));
-}
-
+function qs(selector) { return document.querySelector(selector); }
+function qsa(selector) { return Array.from(document.querySelectorAll(selector)); }
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -84,898 +69,780 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function showToast(text) {
+  let toast = qs("#appToast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "appToast";
+    toast.className = "toast";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = text;
+  toast.classList.add("show");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.remove("show"), 2400);
+}
+
 function updateCredits(value) {
   const btn = qs("#openPricingBtn");
-  if (!btn || typeof value === "undefined" || value === null) return;
-  btn.textContent = `Credits: ${value}`;
+  if (btn && value !== undefined && value !== null) btn.textContent = `Credits: ${value}`;
 }
 
-function syncHistoryFromServer(items) {
-  state.imageHistory = items
-    .filter((x) => x.type === "image")
-    .map((x) => ({
-      title: x.prompt?.slice(0, 28) || "image",
-      sub: x.model || "image"
-    }));
-
-  state.videoHistory = items
-    .filter((x) => x.type === "video")
-    .map((x) => ({
-      title: x.prompt?.slice(0, 28) || "video",
-      sub: x.model || "video"
-    }));
-
-  state.enhanceHistory = items
-    .filter((x) => x.type === "enhance")
-    .map((x) => ({
-      title: x.prompt?.slice(0, 28) || "enhance",
-      sub: x.model || "enhance"
-    }));
-
-  renderHistory();
+function openModal(id) {
+  const el = qs(`#${id}`);
+  if (!el) return;
+  el.classList.remove("hidden");
+  document.body.classList.add("modal-open");
 }
 
-async function loadUser() {
-  try {
-    const response = await fetch(`${API_BASE}/api/user/${userId}`);
-    const data = await response.json();
-
-    if (data.ok) {
-      updateCredits(data.credits);
-      syncHistoryFromServer(data.history || []);
-    }
-  } catch (e) {
-    console.error("loadUser error", e);
-  }
-}
-
-function fileToDataURL(file) {
-  return new Promise((resolve, reject) => {
-    if (!file) return resolve(null);
-
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-function ensureResultBlocks() {
-  const imageScreen = qs("#screen-image");
-  const videoScreen = qs("#screen-video");
-  const enhanceScreen = qs("#screen-enhance");
-
-  if (imageScreen && !qs("#imageResultBlock")) {
-    const block = document.createElement("div");
-    block.id = "imageResultBlock";
-    block.className = "history-block";
-    block.innerHTML = `
-      <div class="section-head small-head">
-        <h3>Результат</h3>
-        <p>Готовая картинка появится здесь</p>
-      </div>
-      <div id="imageResultContent" style="min-height:120px;display:flex;align-items:center;justify-content:center;color:#9c958d;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:18px;background:rgba(255,255,255,0.02);">
-        Пока пусто
-      </div>
-    `;
-    imageScreen.appendChild(block);
-  }
-
-  if (videoScreen && !qs("#videoResultBlock")) {
-    const block = document.createElement("div");
-    block.id = "videoResultBlock";
-    block.className = "history-block";
-    block.innerHTML = `
-      <div class="section-head small-head">
-        <h3>Результат</h3>
-        <p>Готовое видео появится здесь</p>
-      </div>
-      <div id="videoResultContent" style="min-height:120px;display:flex;align-items:center;justify-content:center;color:#9c958d;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:18px;background:rgba(255,255,255,0.02);">
-        Пока пусто
-      </div>
-    `;
-    videoScreen.appendChild(block);
-  }
-
-  if (enhanceScreen && !qs("#enhanceResultBlock")) {
-    const block = document.createElement("div");
-    block.id = "enhanceResultBlock";
-    block.className = "history-block";
-    block.innerHTML = `
-      <div class="section-head small-head">
-        <h3>Результат</h3>
-        <p>Улучшенный файл появится здесь</p>
-      </div>
-      <div id="enhanceResultContent" style="min-height:120px;display:flex;align-items:center;justify-content:center;color:#9c958d;border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:18px;background:rgba(255,255,255,0.02);">
-        Пока пусто
-      </div>
-    `;
-    enhanceScreen.appendChild(block);
+function closeModal(id) {
+  const el = qs(`#${id}`);
+  if (!el) return;
+  el.classList.add("hidden");
+  if (!qsa(".modal-backdrop").some((x) => !x.classList.contains("hidden"))) {
+    document.body.classList.remove("modal-open");
   }
 }
 
 function setActiveNav(screen) {
-  qsa(".topnav-link").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.screen === screen);
-  });
+  qsa(".topnav-link").forEach((btn) => btn.classList.toggle("active", btn.dataset.screen === screen));
 }
 
 function showScreen(screen) {
   state.currentScreen = screen;
   qsa(".screen").forEach((el) => el.classList.remove("active"));
-
-  const target = qs(`#screen-${screen}`);
-  if (target) target.classList.add("active");
-
+  qs(`#screen-${screen}`)?.classList.add("active");
   setActiveNav(screen);
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function openModal(id) {
-  const modal = qs(`#${id}`);
-  if (!modal) return;
-  modal.classList.remove("hidden");
-  document.body.classList.add("modal-open");
-}
-
-function closeModal(id) {
-  const modal = qs(`#${id}`);
-  if (!modal) return;
-  modal.classList.add("hidden");
-
-  const anyOpen = qsa(".modal-backdrop").some((m) => !m.classList.contains("hidden"));
-  if (!anyOpen) {
-    document.body.classList.remove("modal-open");
-  }
-}
-
 function renderHistory() {
-  const imageGrid = qs("#imageHistoryGrid");
-  const videoGrid = qs("#videoHistoryGrid");
-  const enhanceGrid = qs("#enhanceHistoryGrid");
+  const render = (id, items, emptyText) => {
+    const container = qs(id);
+    if (!container) return;
+    if (!items.length) {
+      container.innerHTML = `<div class="history-empty">${emptyText}</div>`;
+      return;
+    }
+    container.innerHTML = items.map((item) => `
+      <article class="history-item glass">
+        <small>${escapeHtml(item.sub)}</small>
+        <strong>${escapeHtml(item.title)}</strong>
+      </article>
+    `).join("");
+  };
 
-  if (imageGrid) {
-    imageGrid.innerHTML = state.imageHistory.length
-      ? state.imageHistory.map(
-          (item) => `
-            <div class="history-item interactive">
-              <small>${escapeHtml(item.sub)}</small>
-              <strong>${escapeHtml(item.title)}</strong>
-            </div>
-          `
-        ).join("")
-      : `<div style="color:#9c958d;">История картинок пока пустая</div>`;
-  }
+  render("#imageHistoryGrid", state.history.image, "История изображений пока пустая");
+  render("#videoHistoryGrid", state.history.video, "История видео пока пустая");
+  render("#enhanceHistoryGrid", state.history.enhance, "История enhance пока пустая");
+}
 
-  if (videoGrid) {
-    videoGrid.innerHTML = state.videoHistory.length
-      ? state.videoHistory.map(
-          (item) => `
-            <div class="history-item interactive">
-              <small>${escapeHtml(item.sub)}</small>
-              <strong>${escapeHtml(item.title)}</strong>
-            </div>
-          `
-        ).join("")
-      : `<div style="color:#9c958d;">История видео пока пустая</div>`;
-  }
+function syncHistoryFromServer(items) {
+  state.history.image = items.filter((x) => x.type === "image").map((x) => ({
+    title: x.prompt?.slice(0, 34) || "image",
+    sub: `${x.model || "image"} • ${x.cost || 0} cr`
+  }));
+  state.history.video = items.filter((x) => x.type === "video").map((x) => ({
+    title: x.prompt?.slice(0, 34) || "video",
+    sub: `${x.model || "video"} • ${x.cost || 0} cr`
+  }));
+  state.history.enhance = items.filter((x) => x.type === "enhance").map((x) => ({
+    title: "Photo enhance",
+    sub: `${x.model || "enhance"} • ${x.cost || 0} cr`
+  }));
+  renderHistory();
+}
 
-  if (enhanceGrid) {
-    enhanceGrid.innerHTML = state.enhanceHistory.length
-      ? state.enhanceHistory.map(
-          (item) => `
-            <div class="history-item interactive">
-              <small>${escapeHtml(item.sub)}</small>
-              <strong>${escapeHtml(item.title)}</strong>
-            </div>
-          `
-        ).join("")
-      : `<div style="color:#9c958d;">История enhance пока пустая</div>`;
+async function loadUser() {
+  try {
+    const res = await fetch(`${API_BASE}/api/user/${userId}`);
+    const data = await res.json();
+    if (data.ok) {
+      updateCredits(data.credits);
+      syncHistoryFromServer(data.history || []);
+    }
+  } catch (error) {
+    console.error(error);
   }
 }
 
-function buildDownloadButton(url, fileName) {
-  return `
-    <a href="${url}" download="${fileName}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">
-      <button class="gold-btn" style="margin-top:12px;">Скачать</button>
-    </a>
-  `;
+function updateFileMeta(id, file) {
+  const el = qs(id);
+  if (el) el.textContent = file ? `${file.name} • ${formatBytes(file.size || 0)}` : "Файл не выбран";
 }
 
-function renderImageResult(url) {
-  const block = qs("#imageResultContent");
-  if (!block) return;
-
-  if (!url) {
-    block.innerHTML = "⚠️ Нет изображения в ответе";
-    return;
+function formatBytes(bytes) {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = bytes;
+  let unit = 0;
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024;
+    unit += 1;
   }
-
-  block.innerHTML = `
-    <div style="width:100%;text-align:center;">
-      <img
-        src="${url}"
-        alt="result"
-        style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"
-      />
-      ${buildDownloadButton(url, "image-result.png")}
-    </div>
-  `;
+  return `${size.toFixed(size >= 100 ? 0 : size >= 10 ? 1 : 2)} ${units[unit]}`;
 }
 
-function renderVideoResult(url) {
-  const block = qs("#videoResultContent");
-  if (!block) return;
-
-  if (!url) {
-    block.innerHTML = "⚠️ Нет видео в ответе";
-    return;
-  }
-
-  block.innerHTML = `
-    <div style="width:100%;text-align:center;">
-      <video
-        src="${url}"
-        controls
-        playsinline
-        style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"
-      ></video>
-      ${buildDownloadButton(url, "video-result.mp4")}
-    </div>
-  `;
+function showProgress(wrapId, barId, textId, value) {
+  const wrap = qs(wrapId);
+  const bar = qs(barId);
+  const text = qs(textId);
+  if (wrap) wrap.classList.remove("hidden");
+  if (bar) bar.style.width = `${Math.max(0, Math.min(100, value))}%`;
+  if (text) text.textContent = `${Math.round(value)}%`;
 }
 
-function renderEnhanceResult({ originalUrl, resultUrl, isFallback = false }) {
-  const block = qs("#enhanceResultContent");
-  if (!block) return;
+function hideProgress(wrapId) {
+  const wrap = qs(wrapId);
+  if (wrap) wrap.classList.add("hidden");
+}
 
-  if (!resultUrl) {
-    block.innerHTML = "⚠️ Нет результата в ответе";
-    return;
-  }
+function startPanelProgress(kind, startText) {
+  const panel = qs(`#${kind}GenerationPanel`);
+  const bar = qs(`#${kind}GenerationBar`);
+  const percent = qs(`#${kind}GenerationPercent`);
+  const status = qs(`#${kind}GenerationStatus`);
+  if (panel) panel.classList.remove("hidden");
+  let current = 0;
+  if (bar) bar.style.width = "0%";
+  if (percent) percent.textContent = "0%";
+  if (status) status.textContent = startText;
 
-  const sameAsOriginal = originalUrl && resultUrl === originalUrl;
+  const timer = setInterval(() => {
+    const target = current < 40 ? current + 7 : current < 70 ? current + 4 : current < 92 ? current + 1.5 : current;
+    current = Math.min(92, target);
+    if (bar) bar.style.width = `${current}%`;
+    if (percent) percent.textContent = `${Math.round(current)}%`;
+    if (status) {
+      status.textContent = current < 30
+        ? "Загрузка запроса"
+        : current < 65
+        ? "Обработка моделью"
+        : "Финализация результата";
+    }
+  }, 350);
 
-  if (!sameAsOriginal && originalUrl) {
-    block.innerHTML = `
-      <div style="width:100%;">
-        <div style="margin-bottom:12px;color:#c8c1b8;text-align:center;">
-          Сравнение до и после
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
-          <div>
-            <div style="margin-bottom:8px;color:#9c958d;text-align:center;">До</div>
-            <img
-              src="${originalUrl}"
-              alt="before"
-              style="width:100%;display:block;border-radius:18px;"
-            />
-          </div>
-
-          <div>
-            <div style="margin-bottom:8px;color:#9c958d;text-align:center;">После</div>
-            <img
-              src="${resultUrl}"
-              alt="after"
-              style="width:100%;display:block;border-radius:18px;"
-            />
-          </div>
-        </div>
-
-        <div style="text-align:center;">
-          ${buildDownloadButton(resultUrl, "enhanced-image.png")}
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  block.innerHTML = `
-    <div style="width:100%;text-align:center;">
-      <div style="margin-bottom:10px;color:#c8c1b8;">
-        ${isFallback || sameAsOriginal ? "Сервер не вернул отдельный улучшенный файл. Сейчас показан исходник." : "Результат enhance готов."}
-      </div>
-      <img
-        src="${resultUrl}"
-        alt="enhanced-result"
-        style="width:100%;max-width:720px;display:block;margin:0 auto;border-radius:18px;"
-      />
-      ${buildDownloadButton(resultUrl, "enhanced-image.png")}
-    </div>
-  `;
+  return {
+    finish(message = "Готово") {
+      clearInterval(timer);
+      if (bar) bar.style.width = "100%";
+      if (percent) percent.textContent = "100%";
+      if (status) status.textContent = message;
+    },
+    fail(message = "Ошибка") {
+      clearInterval(timer);
+      if (status) status.textContent = message;
+    }
+  };
 }
 
 function bindNavigation() {
-  qsa(".topnav-link").forEach((btn) => {
-    btn.addEventListener("click", () => showScreen(btn.dataset.screen));
-  });
-
-  qsa("[data-go]").forEach((btn) => {
-    btn.addEventListener("click", () => showScreen(btn.dataset.go));
-  });
-
+  qsa(".topnav-link").forEach((btn) => btn.addEventListener("click", () => showScreen(btn.dataset.screen)));
+  qsa("[data-go]").forEach((btn) => btn.addEventListener("click", () => showScreen(btn.dataset.go)));
   qs("#openProfileBtn")?.addEventListener("click", () => showScreen("profile"));
   qs("#openPricingBtn")?.addEventListener("click", () => openModal("pricingModal"));
+  qsa("[data-close]").forEach((btn) => btn.addEventListener("click", () => closeModal(btn.dataset.close)));
+  qsa(".modal-backdrop").forEach((bg) => bg.addEventListener("click", (e) => {
+    if (e.target === bg) bg.classList.add("hidden");
+    if (!qsa(".modal-backdrop").some((x) => !x.classList.contains("hidden"))) document.body.classList.remove("modal-open");
+  }));
 }
 
-function updateFileName(inputSelector, outputSelector) {
-  const input = qs(inputSelector);
-  const output = qs(outputSelector);
-  if (!input || !output) return;
+function openSelectionModal(title, options, onSelect) {
+  qs("#selectionModalTitle").textContent = title;
+  qs("#selectionModalList").innerHTML = options.map((option) => `
+    <button class="modal-option glass" data-value="${escapeHtml(option)}">
+      <span>${escapeHtml(option)}</span>
+      <span>✓</span>
+    </button>
+  `).join("");
 
-  input.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    output.textContent = file ? file.name : "Файл не выбран";
-  });
-}
-
-function renderModelOptions(type) {
-  const list = qs("#modelModalList");
-  const title = qs("#modelModalTitle");
-  if (!list || !title) return;
-
-  const models = type === "image" ? imageModels : videoModels;
-  const selected = type === "image" ? state.imageModel : state.videoModel;
-
-  title.textContent = type === "image" ? "Выбор модели изображения" : "Выбор модели видео";
-
-  list.innerHTML = models.map(
-    (model) => `
-      <button class="modal-option ${selected === model ? "selected" : ""}" data-model-type="${type}" data-model-value="${model}">
-        <span>${escapeHtml(model)}</span>
-        <span>${selected === model ? "✓" : ""}</span>
-      </button>
-    `
-  ).join("");
-
-  qsa("[data-model-type]").forEach((btn) => {
+  qsa("#selectionModalList .modal-option").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const value = btn.dataset.modelValue;
+      onSelect(btn.dataset.value);
+      closeModal("selectionModal");
+    });
+  });
 
-      if (type === "image") {
-        state.imageModel = value;
-        qs("#imageModelLabel").textContent = value;
-      } else {
-        state.videoModel = value;
-        qs("#videoModelLabel").textContent = value;
+  openModal("selectionModal");
+}
+
+function refreshLabels() {
+  qs("#imageModelLabel").textContent = state.imageModel;
+  qs("#imageQualityLabel").textContent = state.imageQuality;
+  qs("#ratioImageLabel").textContent = state.imageRatio;
+  qs("#videoModelLabel").textContent = state.videoModel;
+  qs("#videoQualityLabel").textContent = state.videoQuality;
+  qs("#ratioVideoLabel").textContent = state.videoRatio;
+  qs("#durationLabel").textContent = state.videoDuration;
+  qs("#videoResolutionLabel").textContent = state.videoResolution;
+  qs("#enhanceQualityLabel").textContent = state.enhanceQuality;
+  qs("#enhanceResolutionLabel").textContent = state.enhanceResolution;
+  updateCostLabels();
+}
+
+function updateCostLabels() {
+  const imageCost = state.imageQuality === "Quality" ? 3 : state.imageQuality === "Standard" ? 2 : 1;
+  qs("#imageCostLabel").textContent = `Стоимость: ${imageCost} credits`;
+
+  let videoCost = 8;
+  if (state.videoModel === "Kling Motion Control") videoCost = 10;
+  if (state.videoModel === "Veo 3 Quality") videoCost = 16;
+  if (state.videoModel === "Veo 3 Fast" || state.videoModel === "Veo 3 Lite") videoCost = 10;
+  if (state.videoModel === "Seedance 2.0") videoCost = 9;
+  if (state.videoQuality === "Quality") videoCost += 4;
+  if (state.videoQuality === "Fast") videoCost -= 1;
+  const seconds = Number(state.videoDuration.replace(/\D/g, "")) || 5;
+  if (seconds >= 8) videoCost += 2;
+  if (seconds >= 10) videoCost += 2;
+  if (state.videoSound) videoCost += 2;
+  qs("#videoCostLabel").textContent = `Стоимость: ${Math.max(4, videoCost)} credits`;
+
+  const enhanceCost = state.enhanceResolution === "4k" ? 2 : 1;
+  qs("#enhanceCostLabel").textContent = `Стоимость: ${enhanceCost} enhance credits`;
+}
+
+function bindPickers() {
+  qs("#imageModelBtn")?.addEventListener("click", () => openSelectionModal("Image model", imageModels, (value) => {
+    state.imageModel = value;
+    refreshLabels();
+  }));
+  qs("#imageQualityBtn")?.addEventListener("click", () => openSelectionModal("Image quality", imageQualities, (value) => {
+    state.imageQuality = value;
+    refreshLabels();
+  }));
+  qs("#ratioBtnImage")?.addEventListener("click", () => openSelectionModal("Image ratio", imageRatios, (value) => {
+    state.imageRatio = value;
+    refreshLabels();
+  }));
+
+  qs("#videoModelBtn")?.addEventListener("click", () => openSelectionModal("Video model", videoModels, (value) => {
+    state.videoModel = value;
+    const allowed = videoResolutions[value] || ["1080p"];
+    if (!allowed.includes(state.videoResolution)) state.videoResolution = allowed[0];
+    renderVideoModelFields();
+    refreshLabels();
+  }));
+  qs("#videoQualityBtn")?.addEventListener("click", () => openSelectionModal("Video quality", videoQualities, (value) => {
+    state.videoQuality = value;
+    refreshLabels();
+  }));
+  qs("#ratioBtnVideo")?.addEventListener("click", () => openSelectionModal("Video ratio", videoRatios, (value) => {
+    state.videoRatio = value;
+    refreshLabels();
+  }));
+  qs("#durationBtn")?.addEventListener("click", () => openSelectionModal("Duration", durations, (value) => {
+    state.videoDuration = value;
+    refreshLabels();
+  }));
+  qs("#videoResolutionBtn")?.addEventListener("click", () => openSelectionModal("Video resolution", videoResolutions[state.videoModel] || ["1080p"], (value) => {
+    state.videoResolution = value;
+    refreshLabels();
+  }));
+
+  qs("#enhanceQualityBtn")?.addEventListener("click", () => openSelectionModal("Enhance quality", enhanceQualities, (value) => {
+    state.enhanceQuality = value;
+    refreshLabels();
+  }));
+  qs("#enhanceResolutionBtn")?.addEventListener("click", () => openSelectionModal("Enhance resolution", enhanceResolutions, (value) => {
+    state.enhanceResolution = value;
+    refreshLabels();
+  }));
+}
+
+function bindUploadInputs() {
+  qs("#imageUpload")?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0] || null;
+    updateFileMeta("#imageUploadMeta", file);
+  });
+  qs("#enhanceUpload")?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0] || null;
+    updateFileMeta("#enhanceUploadMeta", file);
+  });
+}
+
+function bindSoundToggle() {
+  qsa("#soundToggle .seg-btn").forEach((btn) => btn.addEventListener("click", () => {
+    state.videoSound = btn.dataset.sound === "on";
+    qsa("#soundToggle .seg-btn").forEach((x) => x.classList.toggle("active", x === btn));
+    updateCostLabels();
+  }));
+}
+
+function renderVideoModelFields() {
+  const root = qs("#videoModelFields");
+  if (!root) return;
+
+  if (state.videoModel === "Kling Motion Control") {
+    root.innerHTML = `
+      <div class="grid-two">
+        <div class="field">
+          <label>Reference video</label>
+          <label class="upload-drop" for="motionVideoUpload">
+            <input type="file" id="motionVideoUpload" accept="video/*" />
+            <span>Сначала загрузи видео</span>
+          </label>
+          <div class="file-meta" id="motionVideoMeta">Файл не выбран</div>
+          <div class="progress-wrap hidden" id="motionVideoProgressWrap">
+            <div class="progress-track"><div class="progress-fill" id="motionVideoProgressBar"></div></div>
+            <div class="progress-meta"><span>Upload</span><span id="motionVideoProgressText">0%</span></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Character image</label>
+          <label class="upload-drop" for="motionImageUpload">
+            <input type="file" id="motionImageUpload" accept="image/*" />
+            <span>Потом загрузи фото</span>
+          </label>
+          <div class="file-meta" id="motionImageMeta">Файл не выбран</div>
+          <div class="progress-wrap hidden" id="motionImageProgressWrap">
+            <div class="progress-track"><div class="progress-fill" id="motionImageProgressBar"></div></div>
+            <div class="progress-meta"><span>Upload</span><span id="motionImageProgressText">0%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-two mobile-gap">
+        <div class="field">
+          <label>Scene control mode</label>
+          <div class="toggle-card glass">
+            <div>
+              <strong id="sceneControlStateLabel">Enabled</strong>
+              <p>Выбор источника фона</p>
+            </div>
+            <button class="ios-switch ${state.videoSettings.sceneControlEnabled ? "on" : ""}" id="sceneControlSwitch" type="button"><span></span></button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Background source</label>
+          <div class="segmented" id="sceneControlModeSegment">
+            <button class="seg-btn ${state.videoSettings.sceneControlMode === "character" ? "active" : ""}" data-scene-mode="character">Image character</button>
+            <button class="seg-btn ${state.videoSettings.sceneControlMode === "video" ? "active" : ""}" data-scene-mode="video">Video layer</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="conditional-wrap ${state.videoSettings.sceneControlEnabled ? "hidden" : ""}" id="sceneControlConditional">
+        <div class="field">
+          <label>Scene prompt</label>
+          <textarea id="scenePrompt" class="text-area small" placeholder="Если scene control выключен, тут можно детальнее описать сцену."></textarea>
+        </div>
+        <div class="field">
+          <label>Orientation</label>
+          <div class="segmented" id="orientationSegment">
+            <button class="seg-btn ${state.videoSettings.orientation === "video" ? "active" : ""}" data-orientation="video">Match video</button>
+            <button class="seg-btn ${state.videoSettings.orientation === "image" ? "active" : ""}" data-orientation="image">Match image</button>
+          </div>
+          <div class="help-text">Video — лучше для сложных движений. Image — лучше для движения камеры.</div>
+        </div>
+      </div>
+    `;
+  } else {
+    const needsTwoFrames = state.videoModel === "Kling 3.0" || state.videoModel === "Kling Edit";
+    root.innerHTML = `
+      <div class="grid-two">
+        <div class="field">
+          <label>${state.videoModel.includes("Veo") || state.videoModel === "Seedance 2.0" ? "Image / start frame" : "Start frame"}</label>
+          <label class="upload-drop" for="genericImageUpload">
+            <input type="file" id="genericImageUpload" accept="image/*" />
+            <span>Загрузить изображение</span>
+          </label>
+          <div class="file-meta" id="genericImageMeta">Файл не выбран</div>
+          <div class="progress-wrap hidden" id="genericImageProgressWrap">
+            <div class="progress-track"><div class="progress-fill" id="genericImageProgressBar"></div></div>
+            <div class="progress-meta"><span>Upload</span><span id="genericImageProgressText">0%</span></div>
+          </div>
+        </div>
+        ${needsTwoFrames ? `
+        <div class="field">
+          <label>End frame</label>
+          <label class="upload-drop" for="genericEndImageUpload">
+            <input type="file" id="genericEndImageUpload" accept="image/*" />
+            <span>Необязательно</span>
+          </label>
+          <div class="file-meta" id="genericEndImageMeta">Файл не выбран</div>
+          <div class="progress-wrap hidden" id="genericEndImageProgressWrap">
+            <div class="progress-track"><div class="progress-fill" id="genericEndImageProgressBar"></div></div>
+            <div class="progress-meta"><span>Upload</span><span id="genericEndImageProgressText">0%</span></div>
+          </div>
+        </div>` : `<div class="field field-note"><div class="note-box glass">Для этой модели достаточно одного изображения. У Veo image-to-video fal принимает prompt, image_url, aspect_ratio, duration и resolution. citeturn210878search4turn210878search2</div></div>`}
+      </div>
+    `;
+  }
+
+  bindDynamicVideoInputs();
+}
+
+function bindDynamicVideoInputs() {
+  qs("#genericImageUpload")?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0] || null;
+    state.videoSettings.genericImageFile = file;
+    updateFileMeta("#genericImageMeta", file);
+  });
+
+  qs("#genericEndImageUpload")?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0] || null;
+    state.videoSettings.genericEndImageFile = file;
+    updateFileMeta("#genericEndImageMeta", file);
+  });
+
+  qs("#motionImageUpload")?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0] || null;
+    state.videoSettings.motionImageFile = file;
+    updateFileMeta("#motionImageMeta", file);
+  });
+
+  qs("#motionVideoUpload")?.addEventListener("change", (e) => {
+    const file = e.target.files?.[0] || null;
+    state.videoSettings.motionVideoFile = file;
+    updateFileMeta("#motionVideoMeta", file);
+  });
+
+  qs("#sceneControlSwitch")?.addEventListener("click", () => {
+    state.videoSettings.sceneControlEnabled = !state.videoSettings.sceneControlEnabled;
+    renderVideoModelFields();
+  });
+
+  qsa("[data-scene-mode]").forEach((btn) => btn.addEventListener("click", () => {
+    state.videoSettings.sceneControlMode = btn.dataset.sceneMode;
+    renderVideoModelFields();
+  }));
+
+  qsa("[data-orientation]").forEach((btn) => btn.addEventListener("click", () => {
+    state.videoSettings.orientation = btn.dataset.orientation;
+    renderVideoModelFields();
+  }));
+}
+
+function fileToDataURL(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve(null);
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.onprogress = (e) => {
+      if (e.lengthComputable && typeof onProgress === "function") {
+        onProgress((e.loaded / e.total) * 100);
       }
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
-      closeModal("modelModal");
+function requestWithProgress({ url, body, onUploadProgress }) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("x-user-id", String(userId));
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && typeof onUploadProgress === "function") {
+        onUploadProgress((e.loaded / e.total) * 100);
+      }
+    };
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState !== 4) return;
+      try {
+        const json = JSON.parse(xhr.responseText || "{}");
+        if (xhr.status >= 200 && xhr.status < 300) resolve(json);
+        else reject(new Error(json.error || `Request failed: ${xhr.status}`));
+      } catch (error) {
+        reject(new Error("Некорректный ответ сервера"));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Ошибка сети"));
+    xhr.send(JSON.stringify(body));
+  });
+}
+
+async function robustDownload(url, fileName) {
+  const response = await fetch(url, { mode: "cors" });
+  if (!response.ok) throw new Error("Не удалось скачать файл");
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+}
+
+function renderDownloadButton(url, fileName, label = "Download") {
+  const safeUrl = escapeHtml(url);
+  const safeName = escapeHtml(fileName);
+  return `<button class="secondary-btn download-btn" data-download-url="${safeUrl}" data-download-name="${safeName}">${label}</button>`;
+}
+
+function bindDownloadButtons() {
+  qsa(".download-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const url = btn.dataset.downloadUrl;
+      const fileName = btn.dataset.downloadName || "result";
+      const old = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Downloading...";
+      try {
+        await robustDownload(url, fileName);
+        btn.textContent = "Downloaded";
+      } catch (error) {
+        btn.textContent = old;
+        showToast(error.message || "Download failed");
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = old;
+        }, 1200);
+      }
     });
   });
 }
 
-function renderRatioOptions(type) {
-  const list = qs("#ratioModalList");
-  if (!list) return;
-
-  const selected = type === "image" ? state.imageRatio : state.videoRatio;
-
-  list.innerHTML = ratios.map(
-    (ratio) => `
-      <button class="modal-option ${selected === ratio ? "selected" : ""}" data-ratio-type="${type}" data-ratio-value="${ratio}">
-        <span>${escapeHtml(ratio)}</span>
-        <span>${selected === ratio ? "✓" : ""}</span>
-      </button>
-    `
-  ).join("");
-
-  qsa("[data-ratio-type]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const value = btn.dataset.ratioValue;
-
-      if (type === "image") {
-        state.imageRatio = value;
-        qs("#ratioImageLabel").textContent = value;
-      } else {
-        state.videoRatio = value;
-        qs("#ratioVideoLabel").textContent = value;
-      }
-
-      closeModal("ratioModal");
-    });
-  });
+function renderImageResult(url) {
+  const root = qs("#imageResultContent");
+  if (!root) return;
+  if (!url) {
+    root.innerHTML = `<div class="empty-state">Нет изображения в ответе</div>`;
+    return;
+  }
+  root.innerHTML = `
+    <div class="media-result">
+      <img src="${url}" alt="image result" class="result-image" />
+      <div class="result-actions">${renderDownloadButton(url, "montix-image.png", "Download image")}</div>
+    </div>
+  `;
+  bindDownloadButtons();
 }
 
-function renderDurationOptions() {
-  const list = qs("#durationModalList");
-  if (!list) return;
-
-  list.innerHTML = durations.map(
-    (item) => `
-      <button class="modal-option ${state.duration === item ? "selected" : ""}" data-duration-value="${item}">
-        <span>${escapeHtml(item)}</span>
-        <span>${state.duration === item ? "✓" : ""}</span>
-      </button>
-    `
-  ).join("");
-
-  qsa("[data-duration-value]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const value = btn.dataset.durationValue;
-      state.duration = value;
-      qs("#durationLabel").textContent = value;
-      closeModal("durationModal");
-    });
-  });
+function renderVideoResult(url) {
+  const root = qs("#videoResultContent");
+  if (!root) return;
+  if (!url) {
+    root.innerHTML = `<div class="empty-state">Нет видео в ответе</div>`;
+    return;
+  }
+  root.innerHTML = `
+    <div class="media-result">
+      <video src="${url}" controls playsinline class="result-video"></video>
+      <div class="result-actions">${renderDownloadButton(url, "montix-video.mp4", "Download video")}</div>
+    </div>
+  `;
+  bindDownloadButtons();
 }
 
-function renderQualityOptions(type) {
-  const list = qs("#modelModalList");
-  const title = qs("#modelModalTitle");
-  if (!list || !title) return;
-
-  const options = type === "image" ? imageQualityOptions : videoQualityOptions;
-  const selected = type === "image" ? state.imageQuality : state.videoQuality;
-
-  title.textContent = type === "image" ? "Качество изображения" : "Качество видео";
-
-  list.innerHTML = options.map(
-    (item) => `
-      <button class="modal-option ${selected === item ? "selected" : ""}" data-quality-type="${type}" data-quality-value="${item}">
-        <span>${escapeHtml(item)}</span>
-        <span>${selected === item ? "✓" : ""}</span>
-      </button>
-    `
-  ).join("");
-
-  qsa("[data-quality-type]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const typeValue = btn.dataset.qualityType;
-      const value = btn.dataset.qualityValue;
-
-      if (typeValue === "image") {
-        state.imageQuality = value;
-        qs("#imageQualityLabel").textContent = value;
-      } else {
-        state.videoQuality = value;
-        qs("#videoQualityLabel").textContent = value;
-      }
-
-      closeModal("modelModal");
-    });
-  });
+function renderEnhanceResult(originalUrl, resultUrl) {
+  const root = qs("#enhanceResultContent");
+  if (!root) return;
+  if (!resultUrl) {
+    root.innerHTML = `<div class="empty-state">Нет изображения в ответе</div>`;
+    return;
+  }
+  root.innerHTML = `
+    <div class="compare-grid">
+      <div class="compare-card"><span>Before</span><img src="${originalUrl}" class="result-image" alt="before" /></div>
+      <div class="compare-card"><span>After</span><img src="${resultUrl}" class="result-image" alt="after" /></div>
+    </div>
+    <div class="result-actions">${renderDownloadButton(resultUrl, "montix-enhanced.png", "Download enhanced")}</div>
+  `;
+  bindDownloadButtons();
 }
 
-function bindModals() {
-  qs("#imageModelBtn")?.addEventListener("click", () => {
-    renderModelOptions("image");
-    openModal("modelModal");
-  });
-
-  qs("#videoModelBtn")?.addEventListener("click", () => {
-    renderModelOptions("video");
-    openModal("modelModal");
-  });
-
-  qs("#ratioBtnImage")?.addEventListener("click", () => {
-    renderRatioOptions("image");
-    openModal("ratioModal");
-  });
-
-  qs("#ratioBtnVideo")?.addEventListener("click", () => {
-    renderRatioOptions("video");
-    openModal("ratioModal");
-  });
-
-  qs("#durationBtn")?.addEventListener("click", () => {
-    renderDurationOptions();
-    openModal("durationModal");
-  });
-
-  qs("#imageQualityBtn")?.addEventListener("click", () => {
-    renderQualityOptions("image");
-    openModal("modelModal");
-  });
-
-  qs("#videoQualityBtn")?.addEventListener("click", () => {
-    renderQualityOptions("video");
-    openModal("modelModal");
-  });
-
-  qsa("[data-close]").forEach((btn) => {
-    btn.addEventListener("click", () => closeModal(btn.dataset.close));
-  });
-
-  qsa(".modal-backdrop").forEach((backdrop) => {
-    backdrop.addEventListener("click", (e) => {
-      if (e.target === backdrop) {
-        backdrop.classList.add("hidden");
-        document.body.classList.remove("modal-open");
-      }
-    });
-  });
+function getProfilePayload() {
+  return {
+    username: tgUser?.username || null,
+    first_name: tgUser?.first_name || null,
+    last_name: tgUser?.last_name || null
+  };
 }
 
-function bindExpand() {
-  const btn = qs("#expandBtn");
-  const area = qs("#expandArea");
-  const text = qs("#expandBtnText");
-  if (!btn || !area || !text) return;
+async function handleImageGeneration() {
+  const prompt = qs("#imagePrompt")?.value?.trim();
+  const file = qs("#imageUpload")?.files?.[0] || null;
+  if (!prompt) return showToast("Сначала напиши prompt");
 
-  btn.addEventListener("click", () => {
-    const isHidden = area.classList.contains("hidden");
-    area.classList.toggle("hidden");
-    text.textContent = isHidden ? "Свернуть" : "Развернуть";
-  });
-}
+  const btn = qs("#generateImageBtn");
+  btn.disabled = true;
+  btn.textContent = "Generating...";
 
-async function generateImageReal({ prompt, model, aspectRatio, quality, imageDataUrl }) {
-  const response = await fetch(`${API_BASE}/api/generate-image`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-user-id": String(userId)
-    },
-    body: JSON.stringify({
-      prompt,
-      model,
-      aspectRatio,
-      quality,
-      imageDataUrl,
-      userId,
-      profile: {
-        username: tgUser?.username || null,
-        first_name: tgUser?.first_name || null,
-        last_name: tgUser?.last_name || null
-      }
-    })
-  });
+  const progress = startPanelProgress("image", "Подготовка картинки");
 
-  return await response.json();
-}
-
-async function generateVideoReal({
-  prompt,
-  model,
-  duration,
-  aspect_ratio,
-  quality,
-  startImageDataUrl,
-  endImageDataUrl
-}) {
-  const response = await fetch(`${API_BASE}/api/generate-video`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-user-id": String(userId)
-    },
-    body: JSON.stringify({
-      prompt,
-      model,
-      duration,
-      aspect_ratio,
-      quality,
-      startImageDataUrl,
-      endImageDataUrl,
-      userId,
-      profile: {
-        username: tgUser?.username || null,
-        first_name: tgUser?.first_name || null,
-        last_name: tgUser?.last_name || null
-      }
-    })
-  });
-
-  return await response.json();
-}
-
-async function enhanceFileReal({ fileDataUrl, mimeType }) {
-  const response = await fetch(`${API_BASE}/api/enhance`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-user-id": String(userId)
-    },
-    body: JSON.stringify({
-      fileDataUrl,
-      mimeType,
-      userId,
-      profile: {
-        username: tgUser?.username || null,
-        first_name: tgUser?.first_name || null,
-        last_name: tgUser?.last_name || null
-      }
-    })
-  });
-
-  return await response.json();
-}
-
-function extractImageUrl(data) {
-  return (
-    data?.image ||
-    data?.result?.images?.[0]?.url ||
-    data?.images?.[0]?.url ||
-    null
-  );
-}
-
-function extractVideoUrl(data) {
-  return (
-    data?.video ||
-    data?.video_url ||
-    data?.result?.video?.url ||
-    data?.videos?.[0]?.url ||
-    null
-  );
-}
-
-function extractEnhanceUrl(data) {
-  return (
-    data?.result_url ||
-    data?.file_url ||
-    data?.image ||
-    data?.result?.images?.[0]?.url ||
-    data?.images?.[0]?.url ||
-    null
-  );
-}
-
-function bindGenerators() {
-  qs("#generateImageBtn")?.addEventListener("click", async () => {
-    const prompt = qs("#imagePrompt")?.value?.trim();
-    const imageFile = qs("#imageUpload")?.files?.[0] || null;
-
-    if (!prompt) {
-      showToast("Сначала напиши prompt");
-      return;
+  try {
+    let imageDataUrl = null;
+    if (file) {
+      imageDataUrl = await fileToDataURL(file, (value) => showProgress("#imageUploadProgressWrap", "#imageUploadProgressBar", "#imageUploadProgressText", value));
     }
 
-    const btn = qs("#generateImageBtn");
-    const oldText = btn.textContent;
-    btn.textContent = "Generating...";
-    btn.disabled = true;
-
-    try {
-      const imageDataUrl = imageFile ? await fileToDataURL(imageFile) : null;
-
-      const data = await generateImageReal({
+    const data = await requestWithProgress({
+      url: `${API_BASE}/api/generate-image`,
+      body: {
         prompt,
         model: state.imageModel,
         aspectRatio: state.imageRatio,
-        quality: state.imageQuality,
-        imageDataUrl
-      });
-
-      if (!data.ok) {
-        throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error || "Image generation failed"));
+        quality: state.imageQuality.toLowerCase(),
+        imageDataUrl,
+        userId,
+        profile: getProfilePayload()
+      },
+      onUploadProgress(value) {
+        if (file) showProgress("#imageUploadProgressWrap", "#imageUploadProgressBar", "#imageUploadProgressText", value);
       }
+    });
 
-      const imageUrl = extractImageUrl(data);
-      renderImageResult(imageUrl);
+    if (!data.ok) throw new Error(data.error || "Image generation failed");
+    progress.finish("Картинка готова");
+    renderImageResult(data.image);
+    if (typeof data.credits !== "undefined") updateCredits(data.credits);
+    state.history.image.unshift({ title: prompt.slice(0, 34), sub: `${state.imageModel} • ${data.cost || 0} cr` });
+    state.history.image = state.history.image.slice(0, 9);
+    renderHistory();
+    showToast("Картинка готова");
+  } catch (error) {
+    progress.fail(error.message || "Ошибка");
+    showToast(error.message || "Ошибка");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generate image";
+  }
+}
 
-      if (typeof data.credits !== "undefined") updateCredits(data.credits);
+async function handleVideoGeneration() {
+  const promptBase = qs("#videoPrompt")?.value?.trim();
+  const extraScenePrompt = qs("#scenePrompt")?.value?.trim() || "";
+  const prompt = [promptBase, !state.videoSettings.sceneControlEnabled ? extraScenePrompt : ""].filter(Boolean).join("\n\n");
+  if (!promptBase) return showToast("Сначала напиши prompt");
 
-      state.imageHistory.unshift({
-        title: prompt.slice(0, 28),
-        sub: `${state.imageModel} • ${state.imageQuality}`
-      });
-      state.imageHistory = state.imageHistory.slice(0, 9);
-      renderHistory();
+  const btn = qs("#generateVideoBtn");
+  btn.disabled = true;
+  btn.textContent = "Generating...";
 
-      showToast(imageUrl ? "Картинка готова" : "Ответ получен");
-    } catch (error) {
-      console.error(error);
-      showToast(`Ошибка: ${error.message}`);
-    } finally {
-      btn.textContent = oldText;
-      btn.disabled = false;
+  const progress = startPanelProgress("video", "Подготовка видео");
+
+  try {
+    let imageDataUrl = null;
+    let endImageDataUrl = null;
+    let motionImageDataUrl = null;
+    let motionVideoDataUrl = null;
+
+    if (state.videoModel === "Kling Motion Control") {
+      if (!state.videoSettings.motionVideoFile || !state.videoSettings.motionImageFile) {
+        throw new Error("Для Kling Motion Control загрузи видео и фото");
+      }
+      motionVideoDataUrl = await fileToDataURL(state.videoSettings.motionVideoFile, (value) => showProgress("#motionVideoProgressWrap", "#motionVideoProgressBar", "#motionVideoProgressText", value));
+      motionImageDataUrl = await fileToDataURL(state.videoSettings.motionImageFile, (value) => showProgress("#motionImageProgressWrap", "#motionImageProgressBar", "#motionImageProgressText", value));
+    } else {
+      if (state.videoSettings.genericImageFile) {
+        imageDataUrl = await fileToDataURL(state.videoSettings.genericImageFile, (value) => showProgress("#genericImageProgressWrap", "#genericImageProgressBar", "#genericImageProgressText", value));
+      }
+      if (state.videoSettings.genericEndImageFile) {
+        endImageDataUrl = await fileToDataURL(state.videoSettings.genericEndImageFile, (value) => showProgress("#genericEndImageProgressWrap", "#genericEndImageProgressBar", "#genericEndImageProgressText", value));
+      }
     }
-  });
 
-  qs("#generateVideoBtn")?.addEventListener("click", async () => {
-    const prompt = qs("#videoPrompt")?.value?.trim();
-    const startFile = qs("#videoStartUpload")?.files?.[0] || null;
-    const endFile = qs("#videoEndUpload")?.files?.[0] || null;
-
-    if (!prompt) {
-      showToast("Сначала напиши prompt");
-      return;
-    }
-
-    const btn = qs("#generateVideoBtn");
-    const oldText = btn.textContent;
-    btn.textContent = "Generating...";
-    btn.disabled = true;
-
-    try {
-      const startImageDataUrl = startFile ? await fileToDataURL(startFile) : null;
-      const endImageDataUrl = endFile ? await fileToDataURL(endFile) : null;
-
-      const data = await generateVideoReal({
+    const data = await requestWithProgress({
+      url: `${API_BASE}/api/generate-video`,
+      body: {
         prompt,
         model: state.videoModel,
-        duration: state.duration.replace(" sec", ""),
-        aspect_ratio: state.videoRatio,
-        quality: state.videoQuality,
-        startImageDataUrl,
-        endImageDataUrl
-      });
+        duration: Number(state.videoDuration.replace(/\D/g, "")) || 5,
+        aspectRatio: state.videoRatio,
+        quality: state.videoQuality.toLowerCase(),
+        resolution: state.videoResolution,
+        sound: state.videoSound,
+        imageDataUrl,
+        endImageDataUrl,
+        motionImageDataUrl,
+        motionVideoDataUrl,
+        sceneControlEnabled: state.videoSettings.sceneControlEnabled,
+        sceneControlMode: state.videoSettings.sceneControlMode,
+        orientation: state.videoSettings.orientation,
+        userId,
+        profile: getProfilePayload()
+      },
+      onUploadProgress() {}
+    });
 
-      if (!data.ok) {
-        throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error || "Video generation failed"));
-      }
-
-      const videoUrl = extractVideoUrl(data);
-      renderVideoResult(videoUrl);
-
-      if (typeof data.credits !== "undefined") updateCredits(data.credits);
-
-      state.videoHistory.unshift({
-        title: prompt.slice(0, 28),
-        sub: `${state.videoModel} • ${state.videoQuality}`
-      });
-      state.videoHistory = state.videoHistory.slice(0, 9);
-      renderHistory();
-
-      showToast(videoUrl ? "Видео готово" : "Видео отправлено");
-    } catch (error) {
-      console.error(error);
-      showToast(`Ошибка: ${error.message}`);
-    } finally {
-      btn.textContent = oldText;
-      btn.disabled = false;
-    }
-  });
-
-  qs("#generateEnhanceBtn")?.addEventListener("click", async () => {
-    const file = qs("#enhanceUpload")?.files?.[0] || null;
-
-    if (!file) {
-      showToast("Сначала загрузи фото");
-      return;
-    }
-
-    const btn = qs("#generateEnhanceBtn");
-    const oldText = btn.textContent;
-    btn.textContent = "Enhancing...";
-    btn.disabled = true;
-
-    try {
-      const fileDataUrl = await fileToDataURL(file);
-      const mimeType = file.type || "";
-
-      const data = await enhanceFileReal({
-        fileDataUrl,
-        mimeType
-      });
-
-      if (!data.ok) {
-        throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error || "Enhance failed"));
-      }
-
-      const resultUrl = extractEnhanceUrl(data);
-      const isFallback = !resultUrl;
-
-      renderEnhanceResult({
-        originalUrl: fileDataUrl,
-        resultUrl: resultUrl || fileDataUrl,
-        isFallback
-      });
-
-      state.enhanceHistory.unshift({
-        title: "Photo enhance",
-        sub: "Nano Banana 2 Edit"
-      });
-      state.enhanceHistory = state.enhanceHistory.slice(0, 9);
-      renderHistory();
-
-      showToast(resultUrl ? "Фото улучшено 🔥" : "Сервер не вернул новый файл");
-    } catch (error) {
-      console.error(error);
-      showToast(`Ошибка: ${error.message}`);
-    } finally {
-      btn.textContent = oldText;
-      btn.disabled = false;
-    }
-  });
-}
-
-function bindLibraryButtons() {
-  qs("#openHistoryImage")?.addEventListener("click", () => {
-    qs("#imageHistoryGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-
-  qs("#openHistoryVideo")?.addEventListener("click", () => {
-    qs("#videoHistoryGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-
-  qs("#openHistoryEnhance")?.addEventListener("click", () => {
-    qs("#enhanceHistoryGrid")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-}
-
-function bindProfile() {
-  const avatarInput = qs("#avatarInput");
-  const avatarPreview = qs("#avatarPreview");
-  const nick = qs("#nicknameInput");
-  const hidePromptToggle = qs("#hidePromptToggle");
-  const templatePreview = qs("#templatePreview");
-
-  avatarInput?.addEventListener("change", (e) => {
-    const file = e.target.files?.[0];
-    if (!file || !avatarPreview) return;
-    avatarPreview.textContent = "✓";
-  });
-
-  nick?.addEventListener("input", () => {
-    const value = nick.value.trim() || "kokos_edit";
-    const profileBtn = qs("#openProfileBtn");
-    if (profileBtn) profileBtn.textContent = value.slice(0, 1).toUpperCase();
-  });
-
-  hidePromptToggle?.addEventListener("change", () => {
-    if (!templatePreview) return;
-
-    if (hidePromptToggle.checked) {
-      templatePreview.textContent = "prompt: ******** ******** ****** ** ******";
-    } else {
-      templatePreview.textContent = "prompt: cinematic luxury car in studio";
-    }
-  });
-
-  qs("#saveProfileBtn")?.addEventListener("click", () => {
-    showToast("Профиль сохранен");
-  });
-}
-
-function showToast(text) {
-  let toast = qs("#appToast");
-
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "appToast";
-    toast.style.position = "fixed";
-    toast.style.left = "50%";
-    toast.style.bottom = "22px";
-    toast.style.transform = "translateX(-50%)";
-    toast.style.zIndex = "100";
-    toast.style.padding = "12px 16px";
-    toast.style.borderRadius = "14px";
-    toast.style.background = "rgba(20,20,20,0.92)";
-    toast.style.border = "1px solid rgba(255,255,255,0.08)";
-    toast.style.color = "#f5f1ea";
-    toast.style.boxShadow = "0 12px 30px rgba(0,0,0,0.25)";
-    toast.style.transition = "opacity 0.2s ease";
-    document.body.appendChild(toast);
+    if (!data.ok) throw new Error(data.error || "Video generation failed");
+    progress.finish("Видео готово");
+    renderVideoResult(data.video);
+    if (typeof data.credits !== "undefined") updateCredits(data.credits);
+    state.history.video.unshift({ title: promptBase.slice(0, 34), sub: `${state.videoModel} • ${data.cost || 0} cr` });
+    state.history.video = state.history.video.slice(0, 9);
+    renderHistory();
+    showToast("Видео готово");
+  } catch (error) {
+    progress.fail(error.message || "Ошибка");
+    showToast(error.message || "Ошибка");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generate video";
   }
+}
 
-  toast.textContent = text;
-  toast.style.opacity = "1";
+async function handleEnhance() {
+  const file = qs("#enhanceUpload")?.files?.[0] || null;
+  if (!file) return showToast("Сначала загрузи фото");
 
-  clearTimeout(showToast._timer);
-  showToast._timer = setTimeout(() => {
-    toast.style.opacity = "0";
-  }, 2200);
+  const btn = qs("#generateEnhanceBtn");
+  btn.disabled = true;
+  btn.textContent = "Enhancing...";
+
+  const progress = startPanelProgress("enhance", "Подготовка enhance");
+
+  try {
+    const fileDataUrl = await fileToDataURL(file, (value) => showProgress("#enhanceUploadProgressWrap", "#enhanceUploadProgressBar", "#enhanceUploadProgressText", value));
+
+    const data = await requestWithProgress({
+      url: `${API_BASE}/api/enhance`,
+      body: {
+        fileDataUrl,
+        mimeType: file.type || "image/png",
+        quality: state.enhanceQuality.toLowerCase(),
+        resolution: state.enhanceResolution,
+        userId,
+        profile: getProfilePayload()
+      },
+      onUploadProgress(value) {
+        showProgress("#enhanceUploadProgressWrap", "#enhanceUploadProgressBar", "#enhanceUploadProgressText", value);
+      }
+    });
+
+    if (!data.ok) throw new Error(data.error || "Enhance failed");
+    progress.finish("Enhance готов");
+    renderEnhanceResult(fileDataUrl, data.result_url);
+    state.history.enhance.unshift({ title: "Photo enhance", sub: `Nano Banana 2 Edit • ${data.cost || 0} cr` });
+    state.history.enhance = state.history.enhance.slice(0, 9);
+    renderHistory();
+    showToast("Фото улучшено");
+  } catch (error) {
+    progress.fail(error.message || "Ошибка");
+    showToast(error.message || "Ошибка");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Enhance photo";
+  }
+}
+
+function bindActions() {
+  qs("#generateImageBtn")?.addEventListener("click", handleImageGeneration);
+  qs("#generateVideoBtn")?.addEventListener("click", handleVideoGeneration);
+  qs("#generateEnhanceBtn")?.addEventListener("click", handleEnhance);
+  qs("#openHistoryImage")?.addEventListener("click", () => qs("#imageHistoryGrid")?.scrollIntoView({ behavior: "smooth" }));
+  qs("#openHistoryVideo")?.addEventListener("click", () => qs("#videoHistoryGrid")?.scrollIntoView({ behavior: "smooth" }));
+  qs("#openHistoryEnhance")?.addEventListener("click", () => qs("#enhanceHistoryGrid")?.scrollIntoView({ behavior: "smooth" }));
 }
 
 function init() {
-  ensureResultBlocks();
   bindNavigation();
-  bindModals();
-  bindExpand();
-  bindGenerators();
-  bindLibraryButtons();
-  bindProfile();
-
-  updateFileName("#imageUpload", "#imageUploadMeta");
-  updateFileName("#videoStartUpload", "#videoStartMeta");
-  updateFileName("#videoEndUpload", "#videoEndMeta");
-  updateFileName("#enhanceUpload", "#enhanceUploadMeta");
-
-  if (qs("#imageModelLabel")) qs("#imageModelLabel").textContent = state.imageModel;
-  if (qs("#videoModelLabel")) qs("#videoModelLabel").textContent = state.videoModel;
-  if (qs("#ratioImageLabel")) qs("#ratioImageLabel").textContent = state.imageRatio;
-  if (qs("#ratioVideoLabel")) qs("#ratioVideoLabel").textContent = state.videoRatio;
-  if (qs("#durationLabel")) qs("#durationLabel").textContent = state.duration;
-  if (qs("#imageQualityLabel")) qs("#imageQualityLabel").textContent = state.imageQuality;
-  if (qs("#videoQualityLabel")) qs("#videoQualityLabel").textContent = state.videoQuality;
-
+  bindPickers();
+  bindUploadInputs();
+  bindSoundToggle();
+  bindActions();
+  renderVideoModelFields();
+  refreshLabels();
   renderHistory();
-  showScreen("home");
   loadUser();
+  showScreen("home");
 }
 
 document.addEventListener("DOMContentLoaded", init);
