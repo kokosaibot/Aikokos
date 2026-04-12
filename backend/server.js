@@ -461,7 +461,8 @@ app.post("/api/enhance-image", async (req, res) => {
   }
 
   // вшитый prompt
-  const enhancePrompt ="enhance this image to ultra high quality, restore realistic details, sharpen focus, improve lighting, reduce blur and noise, clean artifacts, increase clarity, professional photography, 8k quality, keep the same composition and subject, do not change identity, do not add new objects";
+  const enhancePrompt =
+    "enhance this image to ultra high quality, restore realistic details, sharpen focus, improve lighting, reduce blur and noise, clean artifacts, increase clarity, professional photography, 8k quality, keep the same composition and subject, do not change identity, do not add new objects";
 
   try {
     await ensureUser(userId, profile);
@@ -479,8 +480,7 @@ app.post("/api/enhance-image", async (req, res) => {
 
     await addHistory(userId, {
       type: "image",
-      model:edits,
-      enhance
+      model: `${model} Enhance`,
       prompt: "[ENHANCE BUILT-IN PROMPT]",
       cost: 1,
       resultUrl: imageUrl,
@@ -621,7 +621,8 @@ app.post("/api/generate-video", async (req, res) => {
       model,
       video: videoUrl,
       credits: creditsAfterSpend
-    });} catch (error) {
+    });
+  } catch (error) {
     try {
       await refundCredits(userId, 8);
     } catch {}
