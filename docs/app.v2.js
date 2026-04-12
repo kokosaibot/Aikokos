@@ -25,6 +25,9 @@ const state = {
   videoRatio: "16:9",
   duration: "5 sec",
 
+  imageQuality: "Standard",
+  videoQuality: "Balanced",
+
   imageHistory: [],
   videoHistory: [],
   enhanceHistory: []
@@ -60,6 +63,9 @@ const ratios = [
 ];
 
 const durations = ["5 sec", "8 sec", "10 sec", "12 sec"];
+
+const imageQualityOptions = ["Fast", "Standard", "Quality"];
+const videoQualityOptions = ["Fast", "Balanced", "Quality"];
 
 function qs(selector) {
   return document.querySelector(selector);
@@ -495,6 +501,43 @@ function renderDurationOptions() {
   });
 }
 
+function renderQualityOptions(type) {
+  const list = qs("#modelModalList");
+  const title = qs("#modelModalTitle");
+  if (!list || !title) return;
+
+  const options = type === "image" ? imageQualityOptions : videoQualityOptions;
+  const selected = type === "image" ? state.imageQuality : state.videoQuality;
+
+  title.textContent = type === "image" ? "Качество изображения" : "Качество видео";
+
+  list.innerHTML = options.map(
+    (item) => `
+      <button class="modal-option ${selected === item ? "selected" : ""}" data-quality-type="${type}" data-quality-value="${item}">
+        <span>${escapeHtml(item)}</span>
+        <span>${selected === item ? "✓" : ""}</span>
+      </button>
+    `
+  ).join("");
+
+  qsa("[data-quality-type]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const typeValue = btn.dataset.qualityType;
+      const value = btn.dataset.qualityValue;
+
+      if (typeValue === "image") {
+        state.imageQuality = value;
+        qs("#imageQualityLabel").textContent = value;
+      } else {
+        state.videoQuality = value;
+        qs("#videoQualityLabel").textContent = value;
+      }
+
+      closeModal("modelModal");
+    });
+  });
+}
+
 function bindModals() {
   qs("#imageModelBtn")?.addEventListener("click", () => {
     renderModelOptions("image");
@@ -519,6 +562,16 @@ function bindModals() {
   qs("#durationBtn")?.addEventListener("click", () => {
     renderDurationOptions();
     openModal("durationModal");
+  });
+
+  qs("#imageQualityBtn")?.addEventListener("click", () => {
+    renderQualityOptions("image");
+    openModal("modelModal");
+  });
+
+  qs("#videoQualityBtn")?.addEventListener("click", () => {
+    renderQualityOptions("video");
+    openModal("modelModal");
   });
 
   qsa("[data-close]").forEach((btn) => {
@@ -548,7 +601,7 @@ function bindExpand() {
   });
 }
 
-async function generateImageReal({ prompt, model, aspectRatio, imageDataUrl }) {
+async function generateImageReal({ prompt, model, aspectRatio, quality, imageDataUrl }) {
   const response = await fetch(`${API_BASE}/api/generate-image`, {
     method: "POST",
     headers: {
@@ -559,6 +612,7 @@ async function generateImageReal({ prompt, model, aspectRatio, imageDataUrl }) {
       prompt,
       model,
       aspectRatio,
+      quality,
       imageDataUrl,
       userId,
       profile: {
@@ -577,6 +631,7 @@ async function generateVideoReal({
   model,
   duration,
   aspect_ratio,
+  quality,
   startImageDataUrl,
   endImageDataUrl
 }) {
@@ -591,6 +646,7 @@ async function generateVideoReal({
       model,
       duration,
       aspect_ratio,
+      quality,
       startImageDataUrl,
       endImageDataUrl,
       userId,
@@ -679,6 +735,7 @@ function bindGenerators() {
         prompt,
         model: state.imageModel,
         aspectRatio: state.imageRatio,
+        quality: state.imageQuality,
         imageDataUrl
       });
 
@@ -693,7 +750,7 @@ function bindGenerators() {
 
       state.imageHistory.unshift({
         title: prompt.slice(0, 28),
-        sub: state.imageModel
+        sub: `${state.imageModel} • ${state.imageQuality}`
       });
       state.imageHistory = state.imageHistory.slice(0, 9);
       renderHistory();
@@ -732,6 +789,7 @@ function bindGenerators() {
         model: state.videoModel,
         duration: state.duration.replace(" sec", ""),
         aspect_ratio: state.videoRatio,
+        quality: state.videoQuality,
         startImageDataUrl,
         endImageDataUrl
       });
@@ -747,7 +805,7 @@ function bindGenerators() {
 
       state.videoHistory.unshift({
         title: prompt.slice(0, 28),
-        sub: `${state.videoModel} • ${state.duration}`
+        sub: `${state.videoModel} • ${state.videoQuality}`
       });
       state.videoHistory = state.videoHistory.slice(0, 9);
       renderHistory();
@@ -796,8 +854,6 @@ function bindGenerators() {
         resultUrl: resultUrl || fileDataUrl,
         isFallback
       });
-
-      if (typeof data.credits !== "undefined") updateCredits(data.credits);
 
       state.enhanceHistory.unshift({
         title: "Photo enhance",
@@ -914,6 +970,8 @@ function init() {
   if (qs("#ratioImageLabel")) qs("#ratioImageLabel").textContent = state.imageRatio;
   if (qs("#ratioVideoLabel")) qs("#ratioVideoLabel").textContent = state.videoRatio;
   if (qs("#durationLabel")) qs("#durationLabel").textContent = state.duration;
+  if (qs("#imageQualityLabel")) qs("#imageQualityLabel").textContent = state.imageQuality;
+  if (qs("#videoQualityLabel")) qs("#videoQualityLabel").textContent = state.videoQuality;
 
   renderHistory();
   showScreen("home");
