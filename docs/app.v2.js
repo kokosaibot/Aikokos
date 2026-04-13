@@ -19,9 +19,9 @@ const videoModels = ["Kling 3.0", "Kling Motion Control", "Kling Edit", "Seedanc
 const imageRatios = ["1:1", "3:4", "4:5", "9:16", "16:9"];
 const videoRatios = ["16:9", "9:16", "1:1"];
 const durations = ["5 sec", "6 sec", "8 sec", "10 sec"];
-const imageQualities = ["Fast", "Standard", "Quality"];
+const imageQualities = ["1K", "2K", "4K"];
 const videoQualities = ["Fast", "Balanced", "Quality"];
-const enhanceQualities = ["Standard", "Quality"];
+const enhanceQualities = ["2K", "4K"];
 const enhanceResolutions = ["2k", "4k"];
 const videoResolutions = {
   "Kling 3.0": ["720p", "1080p"],
@@ -282,7 +282,7 @@ function refreshLabels() {
 }
 
 function updateCostLabels() {
-  const imageCost = state.imageQuality === "Quality" ? 3 : state.imageQuality === "Standard" ? 2 : 1;
+  const imageCost = state.imageQuality === "4K" ? 3 : state.imageQuality === "2K" ? 2 : 1;
   qs("#imageCostLabel").textContent = `Стоимость: ${imageCost} credits`;
 
   let videoCost = 8;
