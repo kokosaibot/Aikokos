@@ -1,3 +1,17 @@
+
+const i18n = {
+  en: {home:"Home",image:"Image",video:"Video",enhance:"Enhance",templates:"Templates"},
+  ru: {home:"Главная",image:"Картинки",video:"Видео",enhance:"Улучшение",templates:"Шаблоны"},
+  uz: {home:"Bosh sahifa",image:"Rasm",video:"Video",enhance:"Yaxshilash",templates:"Shablonlar"}
+};
+let lang = localStorage.getItem("lang") || "ru";
+function applyLang(){
+  document.querySelectorAll("[data-i18n]").forEach(el=>{
+    const key = el.dataset.i18n;
+    if(i18n[lang] && i18n[lang][key]) el.textContent = i18n[lang][key];
+  });
+}
+
 console.log("MONTIX release loaded");
 
 const tg = window.Telegram?.WebApp;
@@ -37,14 +51,14 @@ const state = {
   currentScreen: "home",
   imageModel: "Nano Banana Pro",
   imageRatio: "1:1",
-  imageQuality: "Standard",
+  imageQuality: "1K",
   videoModel: "Kling 3.0",
   videoRatio: "16:9",
   videoQuality: "Balanced",
   videoDuration: "5 sec",
   videoResolution: "1080p",
   videoSound: true,
-  enhanceQuality: "Quality",
+  enhanceQuality: "2K",
   enhanceResolution: "4k",
   history: { image: [], video: [], enhance: [] },
   videoSettings: {
@@ -845,4 +859,27 @@ function init() {
   showScreen("home");
 }
 
-document.addEventListener("DOMContentLoaded", init);
+document.addEventListener("DOMContentLoaded", ()=>{init(); renderTemplates(); applyLang();});
+
+
+const templates = [
+  {id:1,title:"Car cinematic",prompt:"cinematic car neon lights"},
+  {id:2,title:"Portrait",prompt:"soft portrait light"}
+];
+
+function renderTemplates(){
+  const root = document.getElementById("templatesGrid");
+  if(!root) return;
+  root.innerHTML = templates.map(t=>`
+    <div class="template-card" onclick="useTemplate(${t.id})">
+      <div>${t.title}</div>
+    </div>
+  `).join("");
+}
+
+function useTemplate(id){
+  const t = templates.find(x=>x.id===id);
+  document.getElementById("imagePrompt").value = t.prompt;
+  showScreen("image");
+}
+
