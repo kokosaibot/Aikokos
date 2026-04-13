@@ -25,6 +25,7 @@
       </div>
 
       <nav class="topnav glass">
+<select id="langSwitch" onchange="localStorage.setItem('lang',this.value); location.reload();"><option value="ru">RU</option><option value="en">EN</option><option value="uz">UZ</option></select>
         <button class="topnav-link active" data-screen="home">Home</button>
         <button class="topnav-link" data-screen="image">Image</button>
         <button class="topnav-link" data-screen="video">Video</button>
@@ -302,7 +303,13 @@
           </div>
         </div>
       </section>
-    </main>
+    
+<section class="screen" id="screen-templates">
+<h2>Templates</h2>
+<div id="templatesGrid"></div>
+</section>
+</main>
+
   </div>
 
   <div class="modal-backdrop hidden" id="selectionModal">
