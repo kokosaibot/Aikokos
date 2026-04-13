@@ -304,3 +304,11 @@ input, textarea { color: var(--text); }
   .hero-card { padding: 22px; }
   .orb { width: 220px; height: 220px; }
 }
+
+.template-card{
+  padding:12px;
+  border:1px solid rgba(255,255,255,0.1);
+  margin:8px;
+  border-radius:12px;
+  cursor:pointer;
+}
